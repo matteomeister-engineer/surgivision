@@ -4,1757 +4,710 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SurgiVision OS · Intraoperative Intelligence</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
-/* ═══════════════════════════════════════
-   DESIGN SYSTEM — Surgical HUD
-═══════════════════════════════════════ */
 :root {
-  --ink:       #040810;
-  --deep:      #060c14;
-  --panel:     #080f1a;
-  --surface:   #0c1624;
-  --line:      #112030;
-  --line2:     #1a3048;
-
-  --cyan:      #00d4ff;
-  --cyan-dim:  #0088aa;
-  --green:     #00ff88;
-  --green-dim: #008844;
-  --red:       #ff3355;
-  --amber:     #ffaa00;
-  --white:     #e8f4ff;
-  --muted:     #3a6080;
-
-  /* Tissue / anatomy colors */
-  --liver:     rgba(180, 60, 40, 0.75);
-  --gallbladder: rgba(80, 160, 60, 0.75);
-  --vessel:    rgba(220, 50, 80, 0.75);
-  --fat:       rgba(220, 180, 60, 0.75);
-  --instrument: rgba(80, 180, 220, 0.75);
-  --critical:  rgba(255, 50, 50, 0.85);
-
-  --font-display: 'Orbitron', monospace;
+  --bg:      #0a0a0a;
+  --card:    #141414;
+  --card2:   #1c1c1c;
+  --border:  #2a2a2a;
+  --border2: #383838;
+  --white:   #f0f0f0;
+  --white2:  #a0a0a0;
+  --muted:   #555;
+  --red:     #e8001c;
+  --red-dim: #7a0010;
+  --green:   #00c853;
+  --amber:   #ff9800;
+  --font-display: 'Bebas Neue', sans-serif;
   --font-mono:    'IBM Plex Mono', monospace;
   --font-body:    'IBM Plex Sans', sans-serif;
-
-  --radius: 2px;
+  --r: 12px;
+  --gap: 8px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--white); font-family:var(--font-body); }
 
-html, body {
-  width: 100%; height: 100%;
-  overflow: hidden;
-  background: var(--ink);
-  color: var(--white);
-  font-family: var(--font-body);
-}
-
-/* ── Scanline texture ── */
-body::after {
-  content: '';
-  position: fixed; inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0px, transparent 3px,
-    rgba(0, 212, 255, 0.008) 3px, rgba(0, 212, 255, 0.008) 4px
-  );
-  pointer-events: none;
-  z-index: 9999;
-}
-
-/* ══════════════════════
-   LAYOUT
-══════════════════════ */
-#app {
-  display: grid;
-  grid-template-rows: 52px 1fr 40px;
-  grid-template-columns: 1fr 300px;
-  height: 100vh;
-  gap: 0;
-}
-
-/* ══════════════════════
-   TOPBAR
-══════════════════════ */
+/* ── TOPBAR ── */
 #topbar {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  border-bottom: 1px solid var(--line2);
-  background: var(--deep);
-  padding: 0;
-  overflow: hidden;
+  position:fixed; top:0; left:0; right:0; height:46px;
+  background:var(--bg); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:0; z-index:100; padding:0 14px;
 }
-
-.tb-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 20px;
-  border-right: 1px solid var(--line2);
-  height: 100%;
-  flex-shrink: 0;
-}
-
-.tb-logo-text {
-  font-family: var(--font-display);
-  font-size: 0.85rem;
-  font-weight: 900;
-  letter-spacing: 0.15em;
-  color: var(--white);
-}
-
-.tb-logo-text span { color: var(--cyan); }
-
-.tb-divider {
-  width: 1px;
-  height: 28px;
-  background: var(--line2);
-  margin: 0 2px;
-}
-
+.logo { display:flex; align-items:center; gap:9px; margin-right:16px; }
+.logo-mark { font-family:var(--font-display); font-size:1.35rem; letter-spacing:0.08em; color:var(--white); line-height:1; }
+.logo-mark span { color:var(--red); }
+.logo-v { font-family:var(--font-mono); font-size:0.5rem; color:var(--muted); border:1px solid var(--border2); padding:2px 5px; letter-spacing:0.1em; }
+.tsep { width:1px; height:18px; background:var(--border); margin:0 10px; }
 .tb-btn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 16px;
-  height: 100%;
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  text-transform: uppercase;
-  transition: all 0.15s;
-  white-space: nowrap;
-  border-right: 1px solid transparent;
+  font-family:var(--font-mono); font-size:0.58rem; letter-spacing:0.08em;
+  color:var(--muted); background:none; border:none; cursor:pointer;
+  padding:5px 11px; text-transform:uppercase; transition:color 0.15s; white-space:nowrap;
 }
-
-.tb-btn:hover { color: var(--cyan); background: rgba(0,212,255,0.04); }
-
-.tb-btn.active {
-  color: var(--cyan);
-  background: rgba(0,212,255,0.06);
-  border-bottom: 2px solid var(--cyan);
+.tb-btn:hover { color:var(--white); }
+.tb-btn.primary { color:var(--white); background:var(--red); border-radius:6px; }
+.tb-btn.primary:hover { background:#c8001a; }
+.tb-btn:disabled { opacity:0.3; pointer-events:none; }
+.tb-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.epill {
+  display:flex; align-items:center; gap:6px;
+  font-family:var(--font-mono); font-size:0.56rem; color:var(--muted);
+  background:var(--card); border:1px solid var(--border); border-radius:20px; padding:4px 11px;
 }
-
-.tb-btn .icon { font-size: 0.9rem; }
-
-.tb-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  height: 100%;
-  border-left: 1px solid var(--line2);
-}
-
-.tb-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--muted);
-  letter-spacing: 0.08em;
-  border-right: 1px solid var(--line2);
-  height: 100%;
-}
-
-.dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--green);
-  animation: breathe 2.5s ease-in-out infinite;
-}
-.dot.amber { background: var(--amber); }
-.dot.red { background: var(--red); animation: blink-fast 0.5s steps(1) infinite; }
-.dot.off { background: var(--muted); animation: none; }
-
-@keyframes breathe {
-  0%,100% { opacity: 1; box-shadow: 0 0 6px var(--green); }
-  50% { opacity: 0.4; box-shadow: none; }
-}
-@keyframes blink-fast { 50% { opacity: 0; } }
-
-/* API key input inline */
-#api-key-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 14px;
-  height: 100%;
-}
-
+.edot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:breathe 2s ease-in-out infinite; }
+.edot.amber { background:var(--amber); animation:none; }
+.edot.red   { background:var(--red);   animation:blink 0.4s steps(1) infinite; }
+.edot.off   { background:var(--muted); animation:none; }
+@keyframes breathe { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes blink   { 50%{opacity:0} }
 #api-key-input {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  width: 200px;
-  padding: 5px 10px;
-  background: var(--surface);
-  border: 1px solid var(--line2);
-  color: var(--white);
-  outline: none;
-  letter-spacing: 0.05em;
+  font-family:var(--font-mono); font-size:0.58rem; width:185px;
+  padding:5px 10px; background:var(--card); border:1px solid var(--border);
+  color:var(--white); border-radius:6px; outline:none;
+}
+#api-key-input:focus { border-color:var(--white2); }
+#api-key-input::placeholder { color:var(--muted); }
+.save-btn {
+  font-family:var(--font-mono); font-size:0.56rem; padding:5px 11px;
+  background:var(--card2); border:1px solid var(--border2); color:var(--white2);
+  border-radius:6px; cursor:pointer; transition:all 0.15s;
+}
+.save-btn:hover { color:var(--white); border-color:var(--white2); }
+
+/* ── BENTO ── */
+#bento {
+  position:fixed; top:46px; left:0; right:0; bottom:0;
+  padding:var(--gap);
+  display:grid;
+  grid-template-columns: 1fr 215px 215px;
+  grid-template-rows: 1fr 1fr 108px;
+  gap:var(--gap);
 }
 
-#api-key-input:focus { border-color: var(--cyan); }
-#api-key-input::placeholder { color: var(--muted); }
+/* ── CARD BASE ── */
+.card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--r); overflow:hidden;
+  position:relative; display:flex; flex-direction:column;
+}
+.ch {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 13px 8px; border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.ct { font-family:var(--font-mono); font-size:0.54rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.12em; }
+.cbadge { font-family:var(--font-mono); font-size:0.5rem; padding:2px 7px; border-radius:20px; }
+.bg  { background:rgba(0,200,83,0.1);  color:var(--green); border:1px solid rgba(0,200,83,0.25); }
+.br  { background:rgba(232,0,28,0.1);  color:var(--red);   border:1px solid rgba(232,0,28,0.3); }
+.ba  { background:rgba(255,152,0,0.1); color:var(--amber); border:1px solid rgba(255,152,0,0.3); }
+.bd  { background:var(--card2); color:var(--muted); border:1px solid var(--border); }
 
-.tb-save-btn {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  padding: 5px 10px;
-  background: rgba(0,212,255,0.08);
-  border: 1px solid var(--cyan-dim);
-  color: var(--cyan);
-  cursor: pointer;
-  letter-spacing: 0.08em;
-  transition: all 0.15s;
-}
-.tb-save-btn:hover { background: rgba(0,212,255,0.18); }
+/* ── HERO ── */
+#card-img { grid-column:1; grid-row:1/4; }
 
-/* ══════════════════════
-   MAIN VIEWPORT
-══════════════════════ */
-#viewport {
-  position: relative;
-  background: #020609;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* HUD corner brackets */
-#viewport::before, #viewport::after {
-  content: '';
-  position: absolute;
-  width: 40px; height: 40px;
-  border-color: var(--cyan);
-  border-style: solid;
-  opacity: 0.3;
-  z-index: 5;
-  pointer-events: none;
-}
-#viewport::before {
-  top: 16px; left: 16px;
-  border-width: 2px 0 0 2px;
-}
-#viewport::after {
-  bottom: 16px; right: 16px;
-  border-width: 0 2px 2px 0;
-}
-
-/* Drop zone */
 #drop-zone {
-  position: absolute;
-  inset: 40px;
-  border: 1px dashed var(--line2);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-
-#drop-zone:hover, #drop-zone.drag { border-color: var(--cyan); background: rgba(0,212,255,0.02); }
-
-.dz-icon {
-  width: 72px; height: 72px;
-  opacity: 0.12;
-}
-
-.dz-title {
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  color: var(--cyan);
-  text-transform: uppercase;
-}
-
-.dz-sub {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--muted);
-  text-align: center;
-  line-height: 2;
-}
-
-/* Dataset links */
-.dataset-chips {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 8px;
-}
-
-.chip {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  padding: 4px 10px;
-  border: 1px solid var(--line2);
-  color: var(--muted);
-  text-decoration: none;
-  letter-spacing: 0.06em;
-  transition: all 0.15s;
-}
-.chip:hover { border-color: var(--cyan); color: var(--cyan); }
-
-/* Canvas container */
-#canvas-wrap {
-  position: relative;
-  display: none;
-  max-width: 100%;
-  max-height: 100%;
-}
-
-#base-canvas {
-  display: block;
-  max-width: 100%;
-  max-height: calc(100vh - 132px);
-}
-
-#overlay-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-}
-
-/* ── HUD overlays on viewport ── */
-#hud-tl {
-  position: absolute;
-  top: 16px; left: 16px;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: var(--cyan);
-  line-height: 1.9;
-  pointer-events: none;
-  z-index: 10;
-}
-
-#hud-tr {
-  position: absolute;
-  top: 16px; right: 16px;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: var(--green);
-  text-align: right;
-  line-height: 1.9;
-  pointer-events: none;
-  z-index: 10;
-}
-
-#hud-bl {
-  position: absolute;
-  bottom: 16px; left: 16px;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: var(--muted);
-  line-height: 1.9;
-  pointer-events: none;
-  z-index: 10;
-}
-
-#frame-counter {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--font-display);
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: var(--cyan);
-  letter-spacing: 0.15em;
-  pointer-events: none;
-  z-index: 10;
-}
-
-/* Safety alert flash */
-#safety-alert {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  font-weight: 900;
-  letter-spacing: 0.3em;
-  color: var(--red);
-  text-shadow: 0 0 20px var(--red);
-  display: none;
-  z-index: 20;
-  text-align: center;
-  pointer-events: none;
-  animation: flash-alert 0.8s ease infinite;
-}
-
-@keyframes flash-alert {
-  0%,100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-/* Processing overlay */
-#processing {
-  position: absolute;
-  inset: 0;
-  background: rgba(4, 8, 16, 0.82);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 20px;
-  z-index: 30;
-  backdrop-filter: blur(2px);
-}
-#processing.active { display: flex; }
-
-.proc-ring {
-  width: 52px; height: 52px;
-  position: relative;
-}
-
-.proc-ring::before {
-  content: '';
-  position: absolute; inset: 0;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  border-top-color: var(--cyan);
-  animation: spin 0.9s linear infinite;
-}
-
-.proc-ring::after {
-  content: '';
-  position: absolute; inset: 8px;
-  border-radius: 50%;
-  border: 1px solid transparent;
-  border-top-color: var(--green);
-  animation: spin 0.6s linear infinite reverse;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.proc-label {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--cyan);
-  letter-spacing: 0.1em;
-  text-align: center;
-}
-
-.proc-sub {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: var(--muted);
-  animation: blink 1.2s steps(1) infinite;
-}
-
-@keyframes blink { 50% { opacity: 0; } }
-
-/* ══════════════════════
-   VIDEO SCRUBBER
-══════════════════════ */
-#scrubber-bar {
-  display: none;
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 56px;
-  background: linear-gradient(to top, rgba(4,8,16,0.95), transparent);
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px 8px;
-  z-index: 15;
-}
-
-#scrubber-bar.visible { display: flex; }
-
-.scrub-btn {
-  width: 28px; height: 28px;
-  border: 1px solid var(--line2);
-  background: rgba(0,212,255,0.06);
-  color: var(--cyan);
-  font-size: 0.8rem;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-.scrub-btn:hover { background: rgba(0,212,255,0.18); border-color: var(--cyan); }
-
-#timeline {
-  flex: 1;
-  -webkit-appearance: none;
-  height: 3px;
-  background: var(--line2);
-  outline: none;
-  cursor: pointer;
-  border-radius: 0;
-}
-#timeline::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px; height: 14px;
-  background: var(--cyan);
-  border-radius: 0;
-  cursor: pointer;
-  box-shadow: 0 0 8px var(--cyan);
-}
-
-.scrub-time {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--cyan);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* Analyze frame btn */
-#analyze-frame-btn {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  padding: 6px 12px;
-  border: 1px solid var(--cyan-dim);
-  background: rgba(0,212,255,0.08);
-  color: var(--cyan);
-  cursor: pointer;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-#analyze-frame-btn:hover { background: rgba(0,212,255,0.18); }
-#analyze-frame-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-/* ══════════════════════
-   RIGHT PANEL
-══════════════════════ */
-#panel {
-  border-left: 1px solid var(--line2);
-  background: var(--panel);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  grid-row: 2;
-}
-
-/* Stat strip */
-#stat-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border-bottom: 1px solid var(--line2);
-  flex-shrink: 0;
-}
-
-.stat {
-  padding: 10px 12px;
-  border-right: 1px solid var(--line2);
-  text-align: center;
-}
-.stat:last-child { border-right: none; }
-
-.stat-val {
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--cyan);
-  display: block;
-  line-height: 1;
-}
-
-.stat-label {
-  font-family: var(--font-mono);
-  font-size: 0.5rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-top: 4px;
-  display: block;
-}
-
-/* Panel sections */
-.p-section {
-  border-bottom: 1px solid var(--line2);
-  flex-shrink: 0;
-}
-
-.p-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  border-bottom: 1px solid var(--line);
-}
-
-.p-head-badge {
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  padding: 2px 6px;
-  background: rgba(0,212,255,0.1);
-  color: var(--cyan);
-  border: 1px solid var(--cyan-dim);
-}
-
-/* Surgical phase */
-#phase-display {
-  padding: 10px 12px;
-}
-
-#phase-name {
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--green);
-  letter-spacing: 0.1em;
-  margin-bottom: 4px;
-}
-
-#phase-desc {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--muted);
-  line-height: 1.7;
-}
-
-/* Detection list */
-#det-list {
-  max-height: 200px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line2) transparent;
-}
-
-.det-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--line);
-  cursor: pointer;
-  transition: background 0.1s;
-  animation: rowIn 0.25s ease both;
-}
-
-@keyframes rowIn {
-  from { opacity: 0; transform: translateX(8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-.det-row:hover { background: rgba(0,212,255,0.04); }
-.det-row.critical-row { background: rgba(255,51,85,0.06); }
-.det-row.critical-row:hover { background: rgba(255,51,85,0.1); }
-
-.det-swatch {
-  width: 8px; height: 8px;
-  border-radius: 1px;
-  flex-shrink: 0;
-}
-
-.det-info { flex: 1; min-width: 0; }
-
-.det-name {
-  font-family: var(--font-body);
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--white);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.det-type {
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  color: var(--muted);
-  margin-top: 1px;
-}
-
-.det-conf-val {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.det-conf-bar {
-  height: 2px;
-  background: var(--line);
-  margin-top: 3px;
-  border-radius: 1px;
-  overflow: hidden;
-}
-
-.det-conf-fill {
-  height: 100%;
-  border-radius: 1px;
-  transition: width 0.4s ease;
-}
-
-/* Safety warnings */
-#warnings-list {
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  max-height: 120px;
-  overflow-y: auto;
-}
-
-.warning-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--amber);
-  line-height: 1.5;
-  animation: rowIn 0.2s ease both;
-}
-
-.warning-item.critical { color: var(--red); }
-
-.w-icon { flex-shrink: 0; font-size: 0.75rem; margin-top: 1px; }
-
-/* Log */
-#log {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line2) transparent;
-}
-
-.log-row {
-  display: flex;
-  gap: 8px;
-  padding: 2px 12px;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  line-height: 1.7;
-  animation: fadeIn 0.15s ease;
-}
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-.log-time { color: var(--line2); flex-shrink: 0; }
-.log-row.info .log-msg { color: var(--muted); }
-.log-row.ok   .log-msg { color: var(--green); }
-.log-row.warn .log-msg { color: var(--amber); }
-.log-row.err  .log-msg { color: var(--red); }
-.log-row.data .log-msg { color: var(--cyan); }
-
-/* ══════════════════════
-   BOTTOM BAR
-══════════════════════ */
-#bottombar {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  border-top: 1px solid var(--line2);
-  background: var(--deep);
-  padding: 0 16px;
-  font-family: var(--font-mono);
-  font-size: 0.57rem;
-  color: var(--muted);
-  letter-spacing: 0.06em;
-  overflow: hidden;
-}
-
-#ticker {
-  flex: 1;
-  overflow: hidden;
-  height: 100%;
-  display: flex;
-  align-items: center;
-}
-
-#ticker-inner {
-  display: flex;
-  gap: 48px;
-  animation: ticker 30s linear infinite;
-  white-space: nowrap;
-}
-
-@keyframes ticker {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-
-.tick-item { color: var(--muted); }
-.tick-item span { color: var(--cyan); margin-left: 6px; }
-
-#clock {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--cyan);
-  letter-spacing: 0.1em;
-  border-left: 1px solid var(--line2);
-  padding-left: 16px;
-  flex-shrink: 0;
-}
-
-/* ══════════════════════
-   MODAL — no key
-══════════════════════ */
-#modal-bg {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(4,8,16,0.92);
-  z-index: 200;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-}
-#modal-bg.active { display: flex; }
-
-#modal {
-  background: var(--panel);
-  border: 1px solid var(--line2);
-  padding: 32px;
-  max-width: 440px;
-  width: 90%;
-}
-
-.modal-title {
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-  color: var(--cyan);
-  margin-bottom: 16px;
-}
-
-.modal-body {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--muted);
-  line-height: 2;
-  margin-bottom: 20px;
-}
-
-.modal-body a { color: var(--cyan); text-decoration: none; }
-
-.modal-input {
-  width: 100%;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--line2);
-  color: var(--white);
-  outline: none;
-  margin-bottom: 12px;
-  letter-spacing: 0.05em;
-}
-.modal-input:focus { border-color: var(--cyan); }
-
-.modal-row {
-  display: flex;
-  gap: 10px;
-}
-
-.modal-btn {
-  flex: 1;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  padding: 10px;
-  border: 1px solid var(--line2);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition: all 0.15s;
-}
-.modal-btn:hover { border-color: var(--muted); color: var(--white); }
-.modal-btn.primary {
-  border-color: var(--cyan);
-  color: var(--cyan);
-  background: rgba(0,212,255,0.06);
-}
-.modal-btn.primary:hover { background: rgba(0,212,255,0.15); }
-
-/* ══════════════════════
-   SCROLLBARS
-══════════════════════ */
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
-
-/* hidden inputs */
-#file-input { display: none; }
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+  cursor:pointer; border:1.5px dashed var(--border2); margin:10px; border-radius:8px;
+  transition:all 0.2s;
+}
+#drop-zone:hover, #drop-zone.drag { border-color:var(--white2); background:rgba(255,255,255,0.015); }
+.dz-icon { opacity:0.07; }
+.dz-icon svg { width:52px; height:52px; }
+.dz-title { font-family:var(--font-display); font-size:1.05rem; letter-spacing:0.15em; color:var(--white2); }
+.dz-sub { font-family:var(--font-mono); font-size:0.58rem; color:var(--muted); text-align:center; line-height:2; }
+.dsrow { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
+.dsc {
+  font-family:var(--font-mono); font-size:0.53rem; padding:3px 8px;
+  border:1px solid var(--border2); border-radius:20px; color:var(--muted); text-decoration:none; transition:all 0.15s;
+}
+.dsc:hover { color:var(--white); border-color:var(--white2); }
+
+#canvas-wrap { display:none; flex:1; position:relative; overflow:hidden; }
+#base-canvas  { position:absolute; top:0; left:0; display:block; }
+#overlay-canvas { position:absolute; top:0; left:0; pointer-events:none; }
+
+/* HUD corners */
+#canvas-wrap::before, #canvas-wrap::after {
+  content:''; position:absolute; width:22px; height:22px;
+  border-color:rgba(255,255,255,0.35); border-style:solid; z-index:5; pointer-events:none;
+}
+#canvas-wrap::before { top:8px; left:8px; border-width:2px 0 0 2px; }
+#canvas-wrap::after  { bottom:8px; right:8px; border-width:0 2px 2px 0; }
+
+#hud-tl { position:absolute; top:10px; left:12px; font-family:var(--font-mono); font-size:0.5rem; color:rgba(255,255,255,0.4); line-height:1.8; pointer-events:none; z-index:6; }
+#hud-tr { position:absolute; top:10px; right:12px; font-family:var(--font-mono); font-size:0.5rem; color:rgba(255,255,255,0.4); line-height:1.8; text-align:right; pointer-events:none; z-index:6; }
+#frame-tc { position:absolute; bottom:52px; left:50%; transform:translateX(-50%); font-family:var(--font-display); font-size:0.75rem; letter-spacing:0.2em; color:rgba(255,255,255,0.35); pointer-events:none; z-index:6; }
+
+#safety-flash { display:none; position:absolute; inset:0; border:3px solid var(--red); border-radius:var(--r); pointer-events:none; z-index:10; animation:flashborder 0.6s ease infinite; }
+#safety-flash.on { display:block; }
+#safety-lbl { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:var(--font-display); font-size:1.3rem; letter-spacing:0.3em; color:var(--red); text-shadow:0 0 24px var(--red); pointer-events:none; z-index:11; animation:flashborder 0.6s ease infinite; }
+#safety-lbl.on { display:block; }
+@keyframes flashborder { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+#processing { display:none; position:absolute; inset:0; background:rgba(10,10,10,0.82); align-items:center; justify-content:center; flex-direction:column; gap:14px; z-index:20; border-radius:var(--r); backdrop-filter:blur(4px); }
+#processing.on { display:flex; }
+.pring { width:42px; height:42px; position:relative; }
+.pring::before { content:''; position:absolute; inset:0; border-radius:50%; border:2px solid var(--border2); border-top-color:var(--white); animation:spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.ptxt { font-family:var(--font-mono); font-size:0.63rem; color:var(--white2); letter-spacing:0.1em; }
+.psub { font-family:var(--font-mono); font-size:0.53rem; color:var(--muted); animation:blink 1s steps(1) infinite; }
+
+#scrubber { display:none; position:absolute; bottom:0; left:0; right:0; height:46px; background:linear-gradient(to top,rgba(10,10,10,0.96),transparent); align-items:center; gap:9px; padding:0 12px 5px; z-index:8; }
+#scrubber.on { display:flex; }
+.sbtn { width:25px; height:25px; border-radius:6px; border:1px solid var(--border2); background:rgba(255,255,255,0.05); color:var(--white2); font-size:0.65rem; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; }
+.sbtn:hover { background:rgba(255,255,255,0.12); }
+#timeline { flex:1; -webkit-appearance:none; height:2px; background:var(--border2); outline:none; cursor:pointer; }
+#timeline::-webkit-slider-thumb { -webkit-appearance:none; width:11px; height:11px; background:var(--white); border-radius:50%; cursor:pointer; }
+.stime { font-family:var(--font-mono); font-size:0.52rem; color:var(--white2); white-space:nowrap; flex-shrink:0; }
+
+/* ── PHASE CARD ── */
+#card-phase { grid-column:2; grid-row:1; }
+#phase-name { font-family:var(--font-display); font-size:1.45rem; letter-spacing:0.05em; color:var(--white); padding:11px 13px 3px; line-height:1.1; }
+#phase-desc { font-family:var(--font-mono); font-size:0.56rem; color:var(--muted); padding:0 13px 11px; line-height:1.7; flex:1; }
+
+/* ── STATS CARD ── */
+#card-stats { grid-column:3; grid-row:1; }
+.sgrid { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); flex:1; }
+.scell { background:var(--card); padding:13px 13px 10px; display:flex; flex-direction:column; justify-content:space-between; }
+.sval { font-family:var(--font-display); font-size:1.75rem; color:var(--white); letter-spacing:0.03em; line-height:1; }
+.sval.r { color:var(--red); }
+.sval.g { color:var(--green); }
+.sval.a { color:var(--amber); }
+.slbl { font-family:var(--font-mono); font-size:0.5rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-top:5px; }
+
+/* ── STRUCTURES ── */
+#card-str { grid-column:2; grid-row:2; }
+#det-list { flex:1; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+.drow { display:flex; align-items:center; gap:8px; padding:7px 13px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.1s; animation:fadesl 0.2s ease both; }
+@keyframes fadesl { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+.drow:hover { background:var(--card2); }
+.dsw { width:7px; height:7px; border-radius:2px; flex-shrink:0; }
+.di  { flex:1; min-width:0; }
+.dn  { font-family:var(--font-body); font-weight:600; font-size:0.66rem; color:var(--white); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ds  { font-family:var(--font-mono); font-size:0.5rem; color:var(--muted); margin-top:1px; }
+.db  { height:2px; background:var(--border2); border-radius:1px; overflow:hidden; margin-top:3px; }
+.df  { height:100%; border-radius:1px; transition:width 0.4s; }
+.dp  { font-family:var(--font-mono); font-size:0.6rem; font-weight:500; flex-shrink:0; }
+.emsg { font-family:var(--font-mono); font-size:0.58rem; color:var(--muted); text-align:center; padding:18px 13px; line-height:2; }
+
+/* ── WARNINGS ── */
+#card-warn { grid-column:3; grid-row:2; }
+#warn-list { flex:1; overflow-y:auto; padding:6px 0; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+.wrow { display:flex; align-items:flex-start; gap:7px; padding:5px 13px; font-family:var(--font-mono); font-size:0.58rem; line-height:1.6; animation:fadesl 0.2s ease both; }
+.wrow.critical { color:var(--red);   border-left:2px solid var(--red);   padding-left:11px; }
+.wrow.warning  { color:var(--amber); border-left:2px solid var(--amber); padding-left:11px; }
+.wrow.info     { color:var(--muted); border-left:2px solid var(--border2); padding-left:11px; }
+.wi { flex-shrink:0; font-size:0.72rem; margin-top:1px; }
+
+/* ── LOG ── */
+#card-log { grid-column:2/4; grid-row:3; flex-direction:row; }
+#log-area { flex:1; overflow-y:auto; overflow-x:hidden; padding:4px 0; display:flex; flex-direction:column; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+.lrow { display:flex; gap:10px; padding:1px 13px; font-family:var(--font-mono); font-size:0.54rem; line-height:1.8; white-space:nowrap; animation:fin 0.15s ease; }
+@keyframes fin { from{opacity:0} to{opacity:1} }
+.lts  { color:var(--border2); flex-shrink:0; }
+.lrow.info .lm { color:var(--muted); }
+.lrow.ok   .lm { color:var(--green); }
+.lrow.warn .lm { color:var(--amber); }
+.lrow.err  .lm { color:var(--red); }
+.lrow.data .lm { color:var(--white2); }
+
+::-webkit-scrollbar { width:3px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* ── MODAL ── */
+#modal-bg { display:none; position:fixed; inset:0; background:rgba(10,10,10,0.88); z-index:500; align-items:center; justify-content:center; backdrop-filter:blur(6px); }
+#modal-bg.on { display:flex; }
+#modal { background:var(--card); border:1px solid var(--border2); border-radius:16px; padding:30px; max-width:390px; width:90%; }
+.mt { font-family:var(--font-display); font-size:1.35rem; letter-spacing:0.1em; color:var(--white); margin-bottom:12px; }
+.mb { font-family:var(--font-mono); font-size:0.61rem; color:var(--muted); line-height:2; margin-bottom:18px; }
+.mb a { color:var(--white2); text-decoration:none; }
+.mb a:hover { color:var(--white); }
+.mi { width:100%; font-family:var(--font-mono); font-size:0.65rem; padding:9px 13px; background:var(--card2); border:1px solid var(--border2); color:var(--white); border-radius:8px; outline:none; margin-bottom:11px; }
+.mi:focus { border-color:var(--white2); }
+.mrow { display:flex; gap:9px; }
+.mbtn { flex:1; font-family:var(--font-mono); font-size:0.6rem; padding:9px; border:1px solid var(--border2); background:transparent; color:var(--muted); cursor:pointer; border-radius:8px; letter-spacing:0.06em; text-transform:uppercase; transition:all 0.15s; }
+.mbtn:hover { color:var(--white); border-color:var(--white2); }
+.mbtn.p { background:var(--red); border-color:var(--red); color:var(--white); }
+.mbtn.p:hover { background:#c8001a; }
+
+#file-input { display:none; }
 </style>
 </head>
 <body>
 
-<div id="app">
-
-  <!-- ══ TOPBAR ══ -->
-  <div id="topbar">
-    <div class="tb-logo">
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <circle cx="11" cy="11" r="10" stroke="#00d4ff" stroke-width="1" stroke-dasharray="3 2"/>
-        <circle cx="11" cy="11" r="5" stroke="#00ff88" stroke-width="0.8"/>
-        <circle cx="11" cy="11" r="2" fill="#00d4ff"/>
-        <line x1="1" y1="11" x2="6" y2="11" stroke="#00d4ff" stroke-width="0.8"/>
-        <line x1="16" y1="11" x2="21" y2="11" stroke="#00d4ff" stroke-width="0.8"/>
-        <line x1="11" y1="1" x2="11" y2="6" stroke="#00d4ff" stroke-width="0.8"/>
-        <line x1="11" y1="16" x2="11" y2="21" stroke="#00d4ff" stroke-width="0.8"/>
-      </svg>
-      <span class="tb-logo-text">SURGI<span>VISION</span></span>
-    </div>
-
-    <button class="tb-btn active" onclick="triggerUpload('image')">
-      <span class="icon">⊞</span> IMAGE
-    </button>
-    <button class="tb-btn" onclick="triggerUpload('video')">
-      <span class="icon">▶</span> VIDEO
-    </button>
-    <div class="tb-divider"></div>
-    <button class="tb-btn" id="analyze-btn" onclick="analyzeCurrentFrame()" disabled>
-      <span class="icon">◈</span> ANALYZE FRAME
-    </button>
-    <button class="tb-btn" onclick="clearScene()">
-      <span class="icon">✕</span> CLEAR
-    </button>
-
-    <div class="tb-right">
-      <div class="tb-status">
-        <div class="dot" id="engine-dot"></div>
-        <span id="engine-label">GROQ VISION</span>
-      </div>
-      <div id="api-key-wrap">
-        <input id="api-key-input" type="password" placeholder="gsk_... (Groq API key)"/>
-        <button class="tb-save-btn" onclick="saveKey()">SAVE</button>
-      </div>
-    </div>
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="logo">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <circle cx="9" cy="9" r="8" stroke="#f0f0f0" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.35"/>
+      <circle cx="9" cy="9" r="4" stroke="#e8001c" stroke-width="1"/>
+      <circle cx="9" cy="9" r="1.5" fill="#e8001c"/>
+      <line x1="1" y1="9" x2="5" y2="9" stroke="#f0f0f0" stroke-width="0.7" opacity="0.35"/>
+      <line x1="13" y1="9" x2="17" y2="9" stroke="#f0f0f0" stroke-width="0.7" opacity="0.35"/>
+      <line x1="9" y1="1" x2="9" y2="5" stroke="#f0f0f0" stroke-width="0.7" opacity="0.35"/>
+      <line x1="9" y1="13" x2="9" y2="17" stroke="#f0f0f0" stroke-width="0.7" opacity="0.35"/>
+    </svg>
+    <span class="logo-mark">SURGI<span>VISION</span></span>
+    <span class="logo-v">OS v3</span>
   </div>
-
-  <!-- ══ VIEWPORT ══ -->
-  <div id="viewport">
-
-    <!-- Drop zone -->
-    <div id="drop-zone" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" onclick="triggerUpload('image')">
-      <svg class="dz-icon" viewBox="0 0 72 72" fill="none">
-        <rect x="8" y="16" width="56" height="44" rx="2" stroke="#00d4ff" stroke-width="1.5"/>
-        <circle cx="26" cy="32" r="6" stroke="#00d4ff" stroke-width="1.2"/>
-        <path d="M8 46l14-12 10 8 12-14 20 18" stroke="#00ff88" stroke-width="1.2" stroke-linejoin="round"/>
-        <path d="M36 6v18M31 10l5-4 5 4" stroke="#00d4ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <div class="dz-title">Drop surgical footage here</div>
-      <div class="dz-sub">
-        Endoscopic · Laparoscopic · Robotic (da Vinci) · Image or Video<br/>
-        PNG · JPG · MP4 · MOV · WEBM
-      </div>
-      <div class="dataset-chips">
-        <span style="font-family:var(--font-mono);font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;">FREE DATASETS:</span>
-        <a class="chip" href="https://www.kaggle.com/datasets/newslab/cholecseg8k" target="_blank">CholecSeg8k ↗</a>
-        <a class="chip" href="https://github.com/CAMMA-public/Endoscapes" target="_blank">Endoscapes2023 ↗</a>
-        <a class="chip" href="https://github.com/CAMMA-public/cholect50" target="_blank">CholecT45 ↗</a>
-        <a class="chip" href="https://arxiv.org/abs/2507.00209" target="_blank">SurgiSR4K ↗</a>
-      </div>
-    </div>
-
-    <!-- Canvas -->
-    <div id="canvas-wrap">
-      <canvas id="base-canvas"></canvas>
-      <canvas id="overlay-canvas"></canvas>
-    </div>
-
-    <!-- HUD overlays -->
-    <div id="hud-tl"></div>
-    <div id="hud-tr"></div>
-    <div id="hud-bl"></div>
-    <div id="frame-counter"></div>
-    <div id="safety-alert">⚠ CRITICAL STRUCTURE PROXIMITY</div>
-
-    <!-- Processing -->
-    <div id="processing">
-      <div class="proc-ring"></div>
-      <div class="proc-label">RUNNING SCENE PERCEPTION</div>
-      <div class="proc-sub" id="proc-step">Sending frame to Claude Vision API...</div>
-    </div>
-
-    <!-- Video scrubber -->
-    <div id="scrubber-bar">
-      <button class="scrub-btn" id="play-btn" onclick="togglePlay()">▶</button>
-      <input type="range" id="timeline" min="0" max="100" value="0" step="0.1" oninput="seekVideo(this.value)"/>
-      <span class="scrub-time" id="time-display">0:00 / 0:00</span>
-      <button id="analyze-frame-btn" onclick="analyzeCurrentFrame()" disabled>◈ ANALYZE FRAME</button>
-    </div>
-  </div>
-
-  <!-- ══ RIGHT PANEL ══ -->
-  <div id="panel">
-    <!-- Stats -->
-    <div id="stat-strip">
-      <div class="stat">
-        <span class="stat-val" id="s-objects">—</span>
-        <span class="stat-label">Structures</span>
-      </div>
-      <div class="stat">
-        <span class="stat-val" id="s-risk">—</span>
-        <span class="stat-label">Risk Level</span>
-      </div>
-      <div class="stat">
-        <span class="stat-val" id="s-ms">—</span>
-        <span class="stat-label">API ms</span>
-      </div>
-    </div>
-
-    <!-- Surgical Phase -->
-    <div class="p-section">
-      <div class="p-head">
-        Surgical Phase
-        <span class="p-head-badge" id="phase-badge">IDLE</span>
-      </div>
-      <div id="phase-display">
-        <div id="phase-name">AWAITING ANALYSIS</div>
-        <div id="phase-desc">Upload an endoscopic image or video frame to begin intraoperative scene perception.</div>
-      </div>
-    </div>
-
-    <!-- Detected Structures -->
-    <div class="p-section">
-      <div class="p-head">
-        Detected Structures
-        <span class="p-head-badge" id="det-badge">0</span>
-      </div>
-      <div id="det-list">
-        <div style="padding:12px;font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);text-align:center;line-height:2;">
-          No structures detected yet.<br/>Run analysis to populate.
-        </div>
-      </div>
-    </div>
-
-    <!-- Safety Warnings -->
-    <div class="p-section">
-      <div class="p-head">
-        Safety Assessment
-        <span class="p-head-badge" id="warn-badge" style="background:rgba(0,255,136,0.1);color:var(--green);border-color:var(--green-dim);">CLEAR</span>
-      </div>
-      <div id="warnings-list">
-        <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);line-height:2;">
-          No active warnings.
-        </div>
-      </div>
-    </div>
-
-    <!-- Log -->
-    <div class="p-head" style="border-bottom:1px solid var(--line2);flex-shrink:0;">
-      System Log
-    </div>
-    <div id="log"></div>
-  </div>
-
-  <!-- ══ BOTTOM BAR ══ -->
-  <div id="bottombar">
-    <div id="ticker">
-      <div id="ticker-inner">
-        <span class="tick-item">MODEL<span>llama-4-scout-17b</span></span>
-        <span class="tick-item">ENGINE<span>GROQ (FREE)</span></span>
-        <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
-        <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
-        <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
-        <span class="tick-item">VERSION<span>2.2.0</span></span>
-        <!-- duplicate for seamless loop -->
-        <span class="tick-item">MODEL<span>llama-4-scout-17b</span></span>
-        <span class="tick-item">ENGINE<span>GROQ (FREE)</span></span>
-        <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
-        <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
-        <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
-        <span class="tick-item">VERSION<span>2.2.0</span></span>
-      </div>
-    </div>
-    <div id="clock">--:--:--</div>
+  <div class="tsep"></div>
+  <button class="tb-btn" onclick="triggerUpload('image')">↑ IMAGE</button>
+  <button class="tb-btn" onclick="triggerUpload('video')">▶ VIDEO</button>
+  <div class="tsep"></div>
+  <button class="tb-btn primary" id="analyze-btn" onclick="analyzeCurrentFrame()" disabled>◈ ANALYZE</button>
+  <button class="tb-btn" onclick="clearScene()">✕ CLEAR</button>
+  <div class="tb-right">
+    <div class="epill"><div class="edot" id="edot"></div><span id="elbl">GROQ · LLAMA 4</span></div>
+    <input id="api-key-input" type="password" placeholder="gsk_... Groq API key"/>
+    <button class="save-btn" onclick="saveKey()">SAVE</button>
   </div>
 </div>
 
-<!-- Hidden inputs -->
+<!-- BENTO -->
+<div id="bento">
+
+  <!-- HERO IMAGE -->
+  <div class="card" id="card-img">
+    <div class="ch">
+      <span class="ct">Intraoperative Feed</span>
+      <span class="cbadge bd" id="feed-badge">IDLE</span>
+    </div>
+    <div id="drop-zone" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" onclick="triggerUpload('image')">
+      <div class="dz-icon">
+        <svg viewBox="0 0 52 52" fill="none">
+          <rect x="4" y="12" width="44" height="34" rx="2" stroke="#f0f0f0" stroke-width="1.5"/>
+          <circle cx="18" cy="24" r="5" stroke="#f0f0f0" stroke-width="1.2"/>
+          <path d="M4 34l10-9 8 6 10-11 16 14" stroke="#e8001c" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M26 2v14M22 6l4-4 4 4" stroke="#f0f0f0" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="dz-title">Drop surgical image</div>
+      <div class="dz-sub">Endoscopic · Laparoscopic · Robotic<br/>PNG · JPG · MP4 · MOV</div>
+      <div class="dsrow">
+        <a class="dsc" href="https://www.kaggle.com/datasets/newslab/cholecseg8k" target="_blank">CholecSeg8k ↗</a>
+        <a class="dsc" href="https://github.com/CAMMA-public/Endoscapes" target="_blank">Endoscapes ↗</a>
+        <a class="dsc" href="https://github.com/CAMMA-public/cholect50" target="_blank">CholecT45 ↗</a>
+      </div>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="base-canvas"></canvas>
+      <canvas id="overlay-canvas"></canvas>
+      <div id="hud-tl"></div>
+      <div id="hud-tr"></div>
+      <div id="frame-tc"></div>
+      <div id="safety-flash"></div>
+      <div id="safety-lbl">⚠ CRITICAL</div>
+    </div>
+    <div id="processing">
+      <div class="pring"></div>
+      <div class="ptxt">ANALYZING SCENE</div>
+      <div class="psub" id="proc-step">Sending to Groq...</div>
+    </div>
+    <div id="scrubber">
+      <button class="sbtn" id="play-btn" onclick="togglePlay()">▶</button>
+      <input type="range" id="timeline" min="0" max="100" value="0" step="0.1" oninput="seekVideo(this.value)"/>
+      <span class="stime" id="time-display">0:00 / 0:00</span>
+    </div>
+  </div>
+
+  <!-- PHASE -->
+  <div class="card" id="card-phase">
+    <div class="ch"><span class="ct">Surgical Phase</span><span class="cbadge bd" id="phase-badge">IDLE</span></div>
+    <div id="phase-name">AWAITING</div>
+    <div id="phase-desc">Upload an endoscopic frame to detect the current surgical phase.</div>
+  </div>
+
+  <!-- STATS -->
+  <div class="card" id="card-stats">
+    <div class="ch"><span class="ct">Metrics</span></div>
+    <div class="sgrid">
+      <div class="scell"><div class="sval" id="s-obj">—</div><div class="slbl">Structures</div></div>
+      <div class="scell"><div class="sval" id="s-risk">—</div><div class="slbl">Risk</div></div>
+      <div class="scell"><div class="sval" id="s-ms">—</div><div class="slbl">API ms</div></div>
+      <div class="scell"><div class="sval" id="s-conf">—</div><div class="slbl">Avg Conf</div></div>
+    </div>
+  </div>
+
+  <!-- STRUCTURES -->
+  <div class="card" id="card-str">
+    <div class="ch"><span class="ct">Detected Structures</span><span class="cbadge bd" id="det-badge">0</span></div>
+    <div id="det-list"><div class="emsg">No structures detected.<br/>Run analysis to populate.</div></div>
+  </div>
+
+  <!-- WARNINGS -->
+  <div class="card" id="card-warn">
+    <div class="ch"><span class="ct">Safety Assessment</span><span class="cbadge bg" id="warn-badge">CLEAR</span></div>
+    <div id="warn-list"><div class="wrow info"><span>No active warnings.</span></div></div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card" id="card-log">
+    <div class="ch" style="flex-shrink:0;"><span class="ct">System Log</span></div>
+    <div id="log-area"></div>
+  </div>
+
+</div>
+
 <input type="file" id="file-input" accept="image/*,video/*"/>
 
-<!-- ══ MODAL ══ -->
+<!-- MODAL -->
 <div id="modal-bg">
   <div id="modal">
-    <div class="modal-title">API KEY REQUIRED</div>
-    <div class="modal-body">
-      SurgiVision uses <strong style="color:var(--white)">Groq · LLaMA 3.2 Vision</strong> for surgical scene perception — completely free, no credit card needed.<br/><br/>
-      Get a free API key at <a href="https://console.groq.com" target="_blank">console.groq.com ↗</a><br/><br/>
-      Your key is stored only in your browser's sessionStorage and never sent anywhere except directly to Groq.
+    <div class="mt">API KEY REQUIRED</div>
+    <div class="mb">
+      SurgiVision uses <strong style="color:var(--white)">Groq · Llama 4 Scout Vision</strong> — completely free, no credit card.<br/><br/>
+      Get your key at <a href="https://console.groq.com" target="_blank">console.groq.com ↗</a><br/><br/>
+      Stored only in your browser session.
     </div>
-    <input class="modal-input" id="modal-key-input" type="password" placeholder="sk-ant-api03-..."/>
-    <div class="modal-row">
-      <button class="modal-btn" onclick="closeModal()">CANCEL</button>
-      <button class="modal-btn primary" onclick="saveKeyFromModal()">ACTIVATE ENGINE</button>
+    <input class="mi" id="modal-key-input" type="password" placeholder="gsk_..."/>
+    <div class="mrow">
+      <button class="mbtn" onclick="closeModal()">CANCEL</button>
+      <button class="mbtn p" onclick="saveKeyFromModal()">ACTIVATE</button>
     </div>
   </div>
 </div>
 
 <script>
-// ════════════════════════════════════════
-//  STATE
-// ════════════════════════════════════════
 let apiKey = sessionStorage.getItem('sv_key') || '';
-let currentMode = null; // 'image' | 'video'
-let videoEl = null;
-let isPlaying = false;
-let currentFrameData = null;
-let lastAnalysis = null;
-let frameCount = 0;
+let videoEl = null, isPlaying = false;
+let currentFrameData = null, lastAnalysis = null, frameCount = 0;
 
-// Restore key to input
-if (apiKey) {
-  document.getElementById('api-key-input').value = apiKey;
-  setEngineStatus('ready');
-}
+if (apiKey) { document.getElementById('api-key-input').value = apiKey; setStatus('ready'); }
 
-// ════════════════════════════════════════
-//  CLOCK
-// ════════════════════════════════════════
-function updateClock() {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2,'0');
-  const m = String(now.getMinutes()).padStart(2,'0');
-  const s = String(now.getSeconds()).padStart(2,'0');
-  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-// ════════════════════════════════════════
-//  LOGGING
-// ════════════════════════════════════════
 function log(msg, type='info') {
-  const area = document.getElementById('log');
+  const a = document.getElementById('log-area');
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-  const row = document.createElement('div');
-  row.className = `log-row ${type}`;
-  row.innerHTML = `<span class="log-time">${ts}</span><span class="log-msg">${msg}</span>`;
-  area.appendChild(row);
-  area.scrollTop = area.scrollHeight;
+  const r = document.createElement('div');
+  r.className = `lrow ${type}`;
+  r.innerHTML = `<span class="lts">${ts}</span><span class="lm">${msg}</span>`;
+  a.appendChild(r); a.scrollTop = a.scrollHeight;
 }
 
-// ════════════════════════════════════════
-//  ENGINE STATUS
-// ════════════════════════════════════════
-function setEngineStatus(state) {
-  const dot = document.getElementById('engine-dot');
-  const lbl = document.getElementById('engine-label');
-  dot.className = 'dot';
-  if (state === 'ready')        { lbl.textContent = 'ENGINE READY'; }
-  else if (state === 'running') { dot.classList.add('amber'); lbl.textContent = 'ANALYZING...'; }
-  else if (state === 'error')   { dot.classList.add('red');   lbl.textContent = 'ENGINE ERROR'; }
-  else                          { dot.classList.add('off');   lbl.textContent = 'NO API KEY'; }
+function setStatus(s) {
+  const d = document.getElementById('edot'), l = document.getElementById('elbl');
+  d.className = 'edot';
+  if      (s==='ready')   { l.textContent='GROQ · LLAMA 4'; }
+  else if (s==='running') { d.classList.add('amber'); l.textContent='ANALYZING...'; }
+  else if (s==='error')   { d.classList.add('red');   l.textContent='ENGINE ERROR'; }
+  else                    { d.classList.add('off');   l.textContent='NO API KEY'; }
 }
 
-// ════════════════════════════════════════
-//  API KEY
-// ════════════════════════════════════════
 function saveKey() {
-  const val = document.getElementById('api-key-input').value.trim();
-  if (!val) return;
-  apiKey = val;
-  sessionStorage.setItem('sv_key', val);
-  setEngineStatus('ready');
-  log('API key saved. Engine ready.', 'ok');
+  const v = document.getElementById('api-key-input').value.trim();
+  if (!v) return;
+  apiKey = v; sessionStorage.setItem('sv_key', v);
+  setStatus('ready'); log('API key saved. Engine ready.', 'ok');
 }
 
 function saveKeyFromModal() {
-  const val = document.getElementById('modal-key-input').value.trim();
-  if (!val) { log('No API key entered.', 'warn'); return; }
-  apiKey = val;
-  sessionStorage.setItem('sv_key', val);
-  document.getElementById('api-key-input').value = val;
-  setEngineStatus('ready');
-  closeModal();
-  log('API key activated. Engine ready.', 'ok');
-  // Only auto-analyze if we already have a frame loaded
+  const v = document.getElementById('modal-key-input').value.trim();
+  if (!v) return;
+  apiKey = v; sessionStorage.setItem('sv_key', v);
+  document.getElementById('api-key-input').value = v;
+  setStatus('ready'); closeModal(); log('API key activated.', 'ok');
   if (currentFrameData) analyzeCurrentFrame();
-  else log('Now drop an image or video to begin analysis.', 'data');
+  else log('Drop an image or video to begin.', 'data');
 }
 
-function closeModal() { document.getElementById('modal-bg').classList.remove('active'); }
+function closeModal() { document.getElementById('modal-bg').classList.remove('on'); }
 
-// ════════════════════════════════════════
-//  FILE UPLOAD
-// ════════════════════════════════════════
-function triggerUpload(type) {
-  const input = document.getElementById('file-input');
-  input.accept = type === 'video' ? 'video/*' : 'image/*,video/*';
-  input.click();
+function triggerUpload(t) {
+  const i = document.getElementById('file-input');
+  i.accept = t==='video' ? 'video/*' : 'image/*,video/*'; i.click();
 }
 
 document.getElementById('file-input').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  e.target.value = '';
-  handleFile(file);
+  const f = e.target.files[0]; if (!f) return; e.target.value=''; handleFile(f);
 });
 
-function onDrop(e) {
-  e.preventDefault();
-  document.getElementById('drop-zone').classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if (file) handleFile(file);
-}
+function onDrop(e) { e.preventDefault(); document.getElementById('drop-zone').classList.remove('drag'); const f=e.dataTransfer.files[0]; if(f) handleFile(f); }
 function onDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag'); }
 function onDragLeave() { document.getElementById('drop-zone').classList.remove('drag'); }
 
-function handleFile(file) {
-  const isVideo = file.type.startsWith('video/');
-  log(`Loading ${isVideo ? 'video' : 'image'}: ${file.name}`, 'info');
-  if (isVideo) loadVideo(file);
-  else loadImage(file);
+function handleFile(f) {
+  log(`Loading: ${f.name}`, 'info');
+  f.type.startsWith('video/') ? loadVideo(f) : loadImage(f);
 }
 
-// ════════════════════════════════════════
-//  IMAGE LOADING
-// ════════════════════════════════════════
 function loadImage(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
+  const r = new FileReader();
+  r.onload = e => {
     const img = new Image();
     img.onload = () => {
-      currentMode = 'image';
-      if (videoEl) { videoEl.pause(); videoEl = null; }
-      showCanvas();
-      renderImageToCanvas(img);
-      document.getElementById('scrubber-bar').classList.remove('visible');
+      if (videoEl) { videoEl.pause(); videoEl=null; }
+      showCanvas(); renderImg(img);
+      document.getElementById('scrubber').classList.remove('on');
       document.getElementById('analyze-btn').disabled = false;
-      document.getElementById('analyze-frame-btn').disabled = false;
-      log(`Image ready: ${img.width}×${img.height}px`, 'ok');
+      setBadge('feed-badge', 'LIVE', 'bg');
+      log(`Image: ${img.width}×${img.height}px`, 'ok');
       analyzeCurrentFrame();
     };
     img.src = e.target.result;
   };
-  reader.readAsDataURL(file);
+  r.readAsDataURL(file);
 }
 
-function renderImageToCanvas(img) {
+function renderImg(img) {
   const base = document.getElementById('base-canvas');
-  const vp = document.getElementById('viewport');
-  const maxW = vp.clientWidth - 80;
-  const maxH = vp.clientHeight - 80;
-  const scale = Math.min(maxW / img.width, maxH / img.height, 1);
-  base.width = Math.round(img.width * scale);
-  base.height = Math.round(img.height * scale);
-  base.getContext('2d').drawImage(img, 0, 0, base.width, base.height);
-  syncOverlay();
-  captureFrameData();
-  updateHUD(img.width, img.height);
+  const wrap = document.getElementById('canvas-wrap');
+  const s = Math.min(wrap.clientWidth/img.width, wrap.clientHeight/img.height, 1);
+  const w = Math.round(img.width*s), h = Math.round(img.height*s);
+  base.width = w; base.height = h;
+  const offX = Math.round((wrap.clientWidth  - w) / 2);
+  const offY = Math.round((wrap.clientHeight - h) / 2);
+  base.style.left = offX + 'px'; base.style.top = offY + 'px';
+  base.getContext('2d').drawImage(img, 0, 0, w, h);
+  syncOv(offX, offY); captureFrame(); updateHUD(img.width, img.height);
 }
 
-// ════════════════════════════════════════
-//  VIDEO LOADING
-// ════════════════════════════════════════
 function loadVideo(file) {
-  currentMode = 'video';
-  if (videoEl) { videoEl.pause(); videoEl.src = ''; }
-
+  if (videoEl) { videoEl.pause(); videoEl.src=''; }
   videoEl = document.createElement('video');
   videoEl.src = URL.createObjectURL(file);
-  videoEl.muted = true;
-  videoEl.playsInline = true;
-  videoEl.preload = 'auto';
-
+  videoEl.muted=true; videoEl.playsInline=true; videoEl.preload='auto';
   videoEl.addEventListener('loadedmetadata', () => {
     showCanvas();
-    setupVideoCanvas();
-    document.getElementById('scrubber-bar').classList.add('visible');
-    document.getElementById('analyze-btn').disabled = false;
-    document.getElementById('analyze-frame-btn').disabled = false;
+    document.getElementById('scrubber').classList.add('on');
+    document.getElementById('analyze-btn').disabled=false;
     document.getElementById('timeline').max = videoEl.duration;
-    log(`Video ready: ${videoEl.videoWidth}×${videoEl.videoHeight} · ${formatTime(videoEl.duration)}`, 'ok');
-    renderVideoFrame();
+    setBadge('feed-badge','VIDEO','bg');
+    log(`Video: ${videoEl.videoWidth}×${videoEl.videoHeight} · ${fmt(videoEl.duration)}`,'ok');
   });
-
+  videoEl.addEventListener('loadeddata', () => { setupVCanvas(); renderVFrame(); updateHUD(videoEl.videoWidth, videoEl.videoHeight); }, {once:true});
   videoEl.addEventListener('timeupdate', () => {
     document.getElementById('timeline').value = videoEl.currentTime;
-    document.getElementById('time-display').textContent =
-      `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration)}`;
-    renderVideoFrame();
+    document.getElementById('time-display').textContent = `${fmt(videoEl.currentTime)} / ${fmt(videoEl.duration)}`;
+    renderVFrame();
   });
-
-  videoEl.addEventListener('ended', () => {
-    isPlaying = false;
-    document.getElementById('play-btn').textContent = '▶';
-  });
+  videoEl.addEventListener('ended', () => { isPlaying=false; document.getElementById('play-btn').textContent='▶'; });
 }
 
-function setupVideoCanvas() {
-  const base = document.getElementById('base-canvas');
-  const vp = document.getElementById('viewport');
-  const maxW = vp.clientWidth - 80;
-  const maxH = vp.clientHeight - 120;
-
-  videoEl.addEventListener('loadeddata', () => {
-    const scale = Math.min(maxW / videoEl.videoWidth, maxH / videoEl.videoHeight, 1);
-    base.width = Math.round(videoEl.videoWidth * scale);
-    base.height = Math.round(videoEl.videoHeight * scale);
-    syncOverlay();
-    updateHUD(videoEl.videoWidth, videoEl.videoHeight);
-  }, { once: true });
+function setupVCanvas() {
+  const b=document.getElementById('base-canvas'), wrap=document.getElementById('canvas-wrap');
+  const s=Math.min(wrap.clientWidth/videoEl.videoWidth, wrap.clientHeight/videoEl.videoHeight, 1);
+  const w=Math.round(videoEl.videoWidth*s), h=Math.round(videoEl.videoHeight*s);
+  b.width=w; b.height=h;
+  const offX=Math.round((wrap.clientWidth -w)/2), offY=Math.round((wrap.clientHeight-h)/2);
+  b.style.left=offX+'px'; b.style.top=offY+'px';
+  syncOv(offX, offY);
 }
 
-function renderVideoFrame() {
-  const base = document.getElementById('base-canvas');
-  if (!base.width) return;
-  base.getContext('2d').drawImage(videoEl, 0, 0, base.width, base.height);
-  captureFrameData();
-  frameCount++;
-  document.getElementById('frame-counter').textContent =
-    `FRAME ${frameCount} · ${formatTime(videoEl?.currentTime || 0)}`;
+function renderVFrame() {
+  const b=document.getElementById('base-canvas');
+  if (!b.width) return;
+  b.getContext('2d').drawImage(videoEl,0,0,b.width,b.height);
+  captureFrame(); frameCount++;
+  document.getElementById('frame-tc').textContent=`FRAME ${frameCount}`;
 }
 
 function togglePlay() {
   if (!videoEl) return;
-  if (isPlaying) {
-    videoEl.pause();
-    document.getElementById('play-btn').textContent = '▶';
-  } else {
-    videoEl.play();
-    document.getElementById('play-btn').textContent = '⏸';
-  }
-  isPlaying = !isPlaying;
+  isPlaying ? videoEl.pause() : videoEl.play();
+  isPlaying=!isPlaying;
+  document.getElementById('play-btn').textContent=isPlaying?'⏸':'▶';
 }
 
-function seekVideo(val) {
-  if (videoEl) {
-    videoEl.currentTime = parseFloat(val);
-    renderVideoFrame();
-  }
-}
+function seekVideo(v) { if(videoEl){videoEl.currentTime=parseFloat(v); renderVFrame();} }
+function fmt(s) { return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
 
-function formatTime(sec) {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${String(s).padStart(2,'0')}`;
-}
-
-// ════════════════════════════════════════
-//  CANVAS UTILS
-// ════════════════════════════════════════
 function showCanvas() {
-  document.getElementById('drop-zone').style.display = 'none';
-  document.getElementById('canvas-wrap').style.display = 'block';
+  document.getElementById('drop-zone').style.display='none';
+  document.getElementById('canvas-wrap').style.display='flex';
+}
+function syncOv(offX, offY) {
+  const b=document.getElementById('base-canvas'), o=document.getElementById('overlay-canvas');
+  o.width=b.width; o.height=b.height;
+  o.style.left=(offX??parseInt(b.style.left||'0'))+'px';
+  o.style.top =(offY??parseInt(b.style.top ||'0'))+'px';
+}
+function captureFrame() {
+  currentFrameData=document.getElementById('base-canvas').toDataURL('image/jpeg',0.85).split(',')[1];
+}
+function updateHUD(w,h) {
+  document.getElementById('hud-tl').innerHTML=`RES ${w}×${h}`;
+  document.getElementById('hud-tr').innerHTML=`GROQ · L4 SCOUT`;
 }
 
-function syncOverlay() {
-  const base = document.getElementById('base-canvas');
-  const ov = document.getElementById('overlay-canvas');
-  ov.width = base.width;
-  ov.height = base.height;
+function setBadge(id, text, cls) {
+  const el=document.getElementById(id); el.textContent=text; el.className=`cbadge ${cls}`;
 }
 
-function captureFrameData() {
-  const base = document.getElementById('base-canvas');
-  currentFrameData = base.toDataURL('image/jpeg', 0.85).split(',')[1];
-}
+const PROMPT = `You are an intraoperative surgical AI vision system. Analyze the provided endoscopic or laparoscopic surgery frame and return ONLY a valid JSON object — no markdown, no explanation.
 
-function updateHUD(w, h) {
-  document.getElementById('hud-tl').innerHTML =
-    `SURGIVISION OS v2.0<br>INTRAOP INTELLIGENCE<br>RES ${w}×${h}`;
-  document.getElementById('hud-tr').innerHTML =
-    `ENGINE: CLAUDE VISION<br>MODE: SCENE PERCEPTION<br>STATUS: READY`;
-  document.getElementById('hud-bl').innerHTML =
-    `CAMMA · CHOLEC80 · ENDOSCAPES`;
-}
-
-// ════════════════════════════════════════
-//  CLAUDE VISION API CALL
-// ════════════════════════════════════════
-const SYSTEM_PROMPT = `You are an intraoperative surgical AI vision system analyzing endoscopic or laparoscopic surgery footage. Your task is to perform surgical scene perception in real time.
-
-Analyze the provided frame and return ONLY a valid JSON object (no markdown, no explanation) with this exact structure:
-
+JSON structure:
 {
-  "phase": {
-    "name": "Phase name (e.g. Dissection, Clipping, Calot Triangle Dissection, Hemostasis, Extraction, etc.)",
-    "description": "Brief description of what is happening in this surgical phase"
-  },
+  "phase": { "name": "Phase name", "description": "1-sentence description" },
   "structures": [
-    {
-      "label": "Structure name",
-      "type": "anatomy | instrument | tissue | fluid | other",
-      "confidence": 0.0-1.0,
-      "location": "descriptive location in frame (e.g. center-left, upper quadrant)",
-      "bbox": [x_percent, y_percent, width_percent, height_percent],
-      "color": "#hexcolor matching the structure type"
-    }
+    { "label": "name", "type": "anatomy|instrument|tissue|fluid|other", "confidence": 0.0-1.0, "location": "location in frame", "bbox": [x_pct, y_pct, w_pct, h_pct], "color": "#hex" }
   ],
-  "warnings": [
-    {
-      "severity": "critical | warning | info",
-      "message": "Warning message about safety, proximity, or observation"
-    }
-  ],
-  "summary": "1-2 sentence overall scene summary for the surgeon"
+  "warnings": [ { "severity": "critical|warning|info", "message": "text" } ],
+  "summary": "1-sentence scene summary"
 }
-
-Use these colors: liver=#c43020, gallbladder=#40a040, vessel=#e03050, fat=#d0b040, instrument=#40b0d0, bleeding=#ff2040, bile=#80c040, other=#8080c0.
-If the image is not a surgical/medical image, still attempt analysis of what you see using the same format.
-Return ONLY the JSON object.`;
+Colors: liver=#c43020 gallbladder=#40a040 vessel=#e03050 fat=#d0b040 instrument=#c0c8d0 bleeding=#ff2040 bile=#80c040 other=#8080c0.
+Return ONLY JSON.`;
 
 async function analyzeCurrentFrame() {
-  if (!currentFrameData) { log('No frame data — load an image or video first.', 'warn'); return; }
+  if (!currentFrameData) { log('No frame loaded.','warn'); return; }
+  if (!apiKey) { document.getElementById('modal-bg').classList.add('on'); return; }
 
-  if (!apiKey) {
-    document.getElementById('modal-bg').classList.add('active');
-    return;
-  }
-
-  const proc = document.getElementById('processing');
-  const step = document.getElementById('proc-step');
-  proc.classList.add('active');
-  setEngineStatus('running');
-  step.textContent = 'Sending frame to Groq LLaMA Vision...';
-
-  const t0 = performance.now();
-  log('Initiating scene perception analysis...', 'data');
+  const proc=document.getElementById('processing'), step=document.getElementById('proc-step');
+  proc.classList.add('on'); setStatus('running'); step.textContent='Sending to Groq Llama 4...';
+  const t0=performance.now();
+  log('Starting scene perception...','data');
 
   try {
     let res;
     try {
       res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-          max_tokens: 1500,
-          temperature: 0.2,
-          messages: [{
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: SYSTEM_PROMPT + '\n\nAnalyze this surgical frame. Return JSON only.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/jpeg;base64,${currentFrameData}`
-                }
-              }
-            ]
-          }]
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+        body:JSON.stringify({
+          model:'meta-llama/llama-4-scout-17b-16e-instruct',
+          max_tokens:1500, temperature:0.2,
+          messages:[{role:'user', content:[
+            {type:'text', text:PROMPT+'\n\nAnalyze this surgical frame. Return JSON only.'},
+            {type:'image_url', image_url:{url:`data:image/jpeg;base64,${currentFrameData}`}}
+          ]}]
         })
       });
-    } catch (networkErr) {
-      throw new Error('Network error — make sure you are on http://localhost:8080 not file://');
-    }
+    } catch(ne) { throw new Error('Network error — run: python3 -m http.server 8080'); }
 
-    const elapsed = Math.round(performance.now() - t0);
-
+    const elapsed=Math.round(performance.now()-t0);
     if (!res.ok) {
-      let errMsg = `HTTP ${res.status}`;
-      try {
-        const err = await res.json();
-        errMsg = err.error?.message || errMsg;
-        if (res.status === 401) errMsg = 'Invalid API key — check your key at console.groq.com';
-        if (res.status === 429) errMsg = 'Rate limit hit — wait a few seconds and retry';
-      } catch(_) {}
-      throw new Error(errMsg);
+      let m=`HTTP ${res.status}`;
+      try { const e=await res.json(); m=e.error?.message||m; if(res.status===401)m='Invalid API key'; if(res.status===429)m='Rate limit — wait and retry'; } catch(_){}
+      throw new Error(m);
     }
 
-    const data = await res.json();
-    const raw = data.choices?.[0]?.message?.content || '';
+    const data=await res.json();
+    const raw=data.choices?.[0]?.message?.content||'';
+    step.textContent='Parsing output...';
 
-    step.textContent = 'Parsing perception output...';
+    let a;
+    try { a=JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch(pe) { throw new Error(`Parse failed: ${raw.slice(0,200)}`); }
 
-    let analysis;
-    try {
-      const cleaned = raw.replace(/```json|```/g, '').trim();
-      analysis = JSON.parse(cleaned);
-    } catch (pe) {
-      throw new Error(`JSON parse failed. Raw: ${raw.slice(0, 300)}`);
-    }
-
-    lastAnalysis = analysis;
-    log(`Analysis complete in ${elapsed}ms — ${(analysis.structures||[]).length} structures detected.`, 'ok');
-    renderAnalysis(analysis, elapsed);
-    setEngineStatus('ready');
+    lastAnalysis=a;
+    log(`Done in ${elapsed}ms — ${(a.structures||[]).length} structures.`,'ok');
+    renderResult(a,elapsed);
+    setStatus('ready');
 
   } catch(e) {
-    log(`❌ ${e.message}`, 'err');
-    setEngineStatus('error');
-    document.getElementById('phase-name').textContent = 'ANALYSIS FAILED';
-    document.getElementById('phase-desc').textContent = e.message;
+    log(`❌ ${e.message}`,'err');
+    setStatus('error');
+    document.getElementById('phase-name').textContent='FAILED';
+    document.getElementById('phase-desc').textContent=e.message;
   }
-
-  proc.classList.remove('active');
+  proc.classList.remove('on');
 }
 
-// ════════════════════════════════════════
-//  RENDER ANALYSIS
-// ════════════════════════════════════════
-function renderAnalysis(a, ms) {
-  const structures = a.structures || [];
-  const warnings = a.warnings || [];
-  const phase = a.phase || {};
+function renderResult(a, ms) {
+  const str=a.structures||[], wrn=a.warnings||[], ph=a.phase||{};
+  document.getElementById('s-obj').textContent=str.length;
+  document.getElementById('s-ms').textContent=ms;
+  const avg=str.length?Math.round(str.reduce((s,r)=>s+(r.confidence||0),0)/str.length*100)+'%':'—';
+  document.getElementById('s-conf').textContent=avg;
 
-  // Stats
-  document.getElementById('s-objects').textContent = structures.length;
-  document.getElementById('s-ms').textContent = ms;
+  const hasCrit=wrn.some(w=>w.severity==='critical'), hasWrn=wrn.some(w=>w.severity==='warning');
+  const rv=document.getElementById('s-risk');
+  if(hasCrit){rv.textContent='HIGH';rv.className='sval r';} else if(hasWrn){rv.textContent='MED';rv.className='sval a';} else{rv.textContent='LOW';rv.className='sval g';}
 
-  const hasCritical = warnings.some(w => w.severity === 'critical');
-  const hasWarning  = warnings.some(w => w.severity === 'warning');
-  const riskEl = document.getElementById('s-risk');
-  if (hasCritical)     { riskEl.textContent = 'HIGH'; riskEl.style.color = 'var(--red)'; }
-  else if (hasWarning) { riskEl.textContent = 'MED';  riskEl.style.color = 'var(--amber)'; }
-  else                 { riskEl.textContent = 'LOW';  riskEl.style.color = 'var(--green)'; }
+  document.getElementById('phase-name').textContent=(ph.name||'Unknown').toUpperCase();
+  document.getElementById('phase-desc').textContent=ph.description||'';
+  setBadge('phase-badge','ACTIVE','bg');
 
-  // Phase
-  document.getElementById('phase-name').textContent = (phase.name || 'Unknown').toUpperCase();
-  document.getElementById('phase-desc').textContent = phase.description || '';
-  document.getElementById('phase-badge').textContent = 'ACTIVE';
+  if (a.summary) log(a.summary,'data');
+  drawOverlay(str,wrn);
+  renderDetList(str);
+  renderWarnings(wrn);
 
-  // Surgical phase summary as log
-  if (a.summary) log(a.summary, 'data');
-
-  // Overlay
-  drawOverlay(structures, warnings);
-
-  // Detection list
-  renderDetList(structures);
-
-  // Warnings panel
-  renderWarnings(warnings);
-
-  // Safety alert flash
-  const alertEl = document.getElementById('safety-alert');
-  if (hasCritical) {
-    alertEl.style.display = 'block';
-    setTimeout(() => { alertEl.style.display = 'none'; }, 4000);
-  }
-
-  // HUD right update
-  document.getElementById('hud-tr').innerHTML =
-    `PHASE: ${(phase.name||'?').toUpperCase()}<br>STRUCTS: ${structures.length}<br>RISK: ${hasCritical?'⚠ HIGH':hasWarning?'◈ MED':'✓ LOW'}`;
+  const sf=document.getElementById('safety-flash'), sl=document.getElementById('safety-lbl');
+  if (hasCrit) { sf.classList.add('on'); sl.classList.add('on'); setTimeout(()=>{sf.classList.remove('on');sl.classList.remove('on');},4000); }
 }
 
-// ════════════════════════════════════════
-//  CANVAS OVERLAY
-// ════════════════════════════════════════
-function drawOverlay(structures, warnings) {
-  const ov = document.getElementById('overlay-canvas');
-  const ctx = ov.getContext('2d');
-  ctx.clearRect(0, 0, ov.width, ov.height);
-
-  const hasCritical = warnings.some(w => w.severity === 'critical');
-
-  structures.forEach((s, i) => {
-    if (!s.bbox || s.bbox.length < 4) return;
-
-    const [xp, yp, wp, hp] = s.bbox;
-    const x = (xp / 100) * ov.width;
-    const y = (yp / 100) * ov.height;
-    const w = (wp / 100) * ov.width;
-    const h = (hp / 100) * ov.height;
-    const color = s.color || '#00d4ff';
-    const isCrit = s.type === 'vessel' || (hasCritical && i < 2);
-
-    // Fill
-    ctx.fillStyle = color.replace(')', ',0.15)').replace('rgb', 'rgba').replace('#', '').length > 6
-      ? color + '28' : hexAlpha(color, 0.15);
-    ctx.fillRect(x, y, w, h);
-
-    // Border
-    ctx.strokeStyle = color;
-    ctx.lineWidth = isCrit ? 2.5 : 1.5;
-    if (isCrit) ctx.setLineDash([6, 3]);
-    ctx.strokeRect(x, y, w, h);
-    ctx.setLineDash([]);
-
-    // Corner brackets
-    const cs = Math.min(w, h, 16) * 0.4;
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    // TL
-    ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y);
-    // TR
-    ctx.moveTo(x + w - cs, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cs);
-    // BR
-    ctx.moveTo(x + w, y + h - cs); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - cs, y + h);
-    // BL
-    ctx.moveTo(x + cs, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - cs);
+function drawOverlay(str, wrn) {
+  const ov=document.getElementById('overlay-canvas'), ctx=ov.getContext('2d');
+  ctx.clearRect(0,0,ov.width,ov.height);
+  str.forEach(s => {
+    if (!s.bbox||s.bbox.length<4) return;
+    const [xp,yp,wp,hp]=s.bbox;
+    const x=(xp/100)*ov.width, y=(yp/100)*ov.height, w=(wp/100)*ov.width, h=(hp/100)*ov.height;
+    const c=s.color||'#ffffff';
+    ctx.fillStyle=hexA(c,0.12); ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle=c; ctx.lineWidth=1.5; ctx.strokeRect(x,y,w,h);
+    const cs=Math.min(w,h,18)*0.38; ctx.lineWidth=2.5; ctx.beginPath();
+    ctx.moveTo(x,y+cs);ctx.lineTo(x,y);ctx.lineTo(x+cs,y);
+    ctx.moveTo(x+w-cs,y);ctx.lineTo(x+w,y);ctx.lineTo(x+w,y+cs);
+    ctx.moveTo(x+w,y+h-cs);ctx.lineTo(x+w,y+h);ctx.lineTo(x+w-cs,y+h);
+    ctx.moveTo(x+cs,y+h);ctx.lineTo(x,y+h);ctx.lineTo(x,y+h-cs);
     ctx.stroke();
-
-    // Label badge
-    const conf = Math.round((s.confidence || 0) * 100);
-    const labelText = `${s.label.toUpperCase()}  ${conf}%`;
-    ctx.font = `500 10px "IBM Plex Mono", monospace`;
-    const tw = ctx.measureText(labelText).width;
-    const bx = x;
-    const by = y > 20 ? y - 18 : y + h + 2;
-
-    ctx.fillStyle = color;
-    ctx.fillRect(bx, by, tw + 14, 16);
-    ctx.fillStyle = '#040810';
-    ctx.fillText(labelText, bx + 7, by + 11);
-  });
-
-  // Scan line sweep animation (one-time)
-  let sweep = 0;
-  const sweepAnim = () => {
-    if (sweep > ov.height) return;
-    ctx.strokeStyle = 'rgba(0,212,255,0.12)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, sweep);
-    ctx.lineTo(ov.width, sweep);
-    ctx.stroke();
-    sweep += 4;
-    requestAnimationFrame(sweepAnim);
-  };
-  sweepAnim();
-}
-
-function hexAlpha(hex, alpha) {
-  const r = parseInt(hex.slice(1,3),16);
-  const g = parseInt(hex.slice(3,5),16);
-  const b = parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-// ════════════════════════════════════════
-//  DETECTION LIST
-// ════════════════════════════════════════
-function renderDetList(structures) {
-  const list = document.getElementById('det-list');
-  list.innerHTML = '';
-  document.getElementById('det-badge').textContent = structures.length;
-
-  if (!structures.length) {
-    list.innerHTML = '<div style="padding:12px;font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);text-align:center;">No structures detected.</div>';
-    return;
-  }
-
-  const sorted = [...structures].sort((a,b) => (b.confidence||0) - (a.confidence||0));
-  sorted.forEach((s, i) => {
-    const conf = Math.round((s.confidence || 0) * 100);
-    const color = s.color || '#00d4ff';
-    const row = document.createElement('div');
-    row.className = 'det-row' + (s.type === 'vessel' ? ' critical-row' : '');
-    row.style.animationDelay = `${i*30}ms`;
-    row.innerHTML = `
-      <div class="det-swatch" style="background:${color}"></div>
-      <div class="det-info">
-        <div class="det-name">${s.label}</div>
-        <div class="det-type">${s.type} · ${s.location || '?'}</div>
-        <div class="det-conf-bar"><div class="det-conf-fill" style="width:${conf}%;background:${color}"></div></div>
-      </div>
-      <div class="det-conf-val" style="color:${color}">${conf}%</div>`;
-    list.appendChild(row);
+    const conf=Math.round((s.confidence||0)*100), lbl=`${s.label.toUpperCase()}  ${conf}%`;
+    ctx.font='500 10px "IBM Plex Mono",monospace';
+    const tw=ctx.measureText(lbl).width, bx=x, by=y>18?y-18:y+h+2;
+    ctx.fillStyle=c; ctx.fillRect(bx,by,tw+12,16);
+    ctx.fillStyle='#0a0a0a'; ctx.fillText(lbl,bx+6,by+11);
   });
 }
 
-// ════════════════════════════════════════
-//  WARNINGS
-// ════════════════════════════════════════
-function renderWarnings(warnings) {
-  const list = document.getElementById('warnings-list');
-  const badge = document.getElementById('warn-badge');
-  list.innerHTML = '';
+function hexA(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return `rgba(${r},${g},${b},${a})`;}
 
-  if (!warnings.length) {
-    badge.textContent = 'CLEAR';
-    badge.style.cssText = 'background:rgba(0,255,136,0.1);color:var(--green);border-color:var(--green-dim)';
-    list.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);line-height:2;">No active warnings.</div>';
-    return;
-  }
-
-  const hasCrit = warnings.some(w => w.severity === 'critical');
-  if (hasCrit) {
-    badge.textContent = '⚠ CRITICAL';
-    badge.style.cssText = 'background:rgba(255,51,85,0.15);color:var(--red);border-color:var(--red)';
-  } else {
-    badge.textContent = '◈ CAUTION';
-    badge.style.cssText = 'background:rgba(255,170,0,0.1);color:var(--amber);border-color:var(--amber)';
-  }
-
-  warnings.forEach((w, i) => {
-    const icon = w.severity === 'critical' ? '⚠' : w.severity === 'warning' ? '◈' : 'ℹ';
-    const item = document.createElement('div');
-    item.className = 'warning-item' + (w.severity === 'critical' ? ' critical' : '');
-    item.style.animationDelay = `${i*40}ms`;
-    item.innerHTML = `<span class="w-icon">${icon}</span><span>${w.message}</span>`;
-    list.appendChild(item);
-    log(`[${w.severity.toUpperCase()}] ${w.message}`, w.severity === 'critical' ? 'err' : 'warn');
+function renderDetList(str) {
+  const list=document.getElementById('det-list');
+  document.getElementById('det-badge').textContent=str.length;
+  list.innerHTML='';
+  if (!str.length){list.innerHTML='<div class="emsg">No structures detected.</div>';return;}
+  [...str].sort((a,b)=>(b.confidence||0)-(a.confidence||0)).forEach((s,i)=>{
+    const conf=Math.round((s.confidence||0)*100), c=s.color||'#fff';
+    const r=document.createElement('div'); r.className='drow'; r.style.animationDelay=`${i*30}ms`;
+    r.innerHTML=`<div class="dsw" style="background:${c}"></div><div class="di"><div class="dn">${s.label}</div><div class="ds">${s.type}·${s.location||'?'}</div><div class="db"><div class="df" style="width:${conf}%;background:${c}"></div></div></div><div class="dp" style="color:${c}">${conf}%</div>`;
+    list.appendChild(r);
   });
 }
 
-// ════════════════════════════════════════
-//  CLEAR
-// ════════════════════════════════════════
+function renderWarnings(wrn) {
+  const list=document.getElementById('warn-list'), badge=document.getElementById('warn-badge');
+  list.innerHTML='';
+  if (!wrn.length){badge.textContent='CLEAR';badge.className='cbadge bg';list.innerHTML='<div class="wrow info"><span>No active warnings.</span></div>';return;}
+  const hc=wrn.some(w=>w.severity==='critical');
+  badge.textContent=hc?'⚠ CRITICAL':'◈ CAUTION'; badge.className=hc?'cbadge br':'cbadge ba';
+  wrn.forEach((w,i)=>{
+    const ic=w.severity==='critical'?'⚠':w.severity==='warning'?'◈':'ℹ';
+    const r=document.createElement('div'); r.className=`wrow ${w.severity}`; r.style.animationDelay=`${i*40}ms`;
+    r.innerHTML=`<span class="wi">${ic}</span><span>${w.message}</span>`;
+    list.appendChild(r);
+    log(`[${w.severity.toUpperCase()}] ${w.message}`, w.severity==='critical'?'err':'warn');
+  });
+}
+
 function clearScene() {
-  if (videoEl) { videoEl.pause(); videoEl.src = ''; videoEl = null; }
-  currentMode = null;
-  currentFrameData = null;
-  lastAnalysis = null;
-  isPlaying = false;
-  frameCount = 0;
-
-  document.getElementById('drop-zone').style.display = 'flex';
-  document.getElementById('canvas-wrap').style.display = 'none';
-  document.getElementById('scrubber-bar').classList.remove('visible');
-  document.getElementById('analyze-btn').disabled = true;
-  document.getElementById('analyze-frame-btn').disabled = true;
-  document.getElementById('play-btn').textContent = '▶';
-  document.getElementById('hud-tl').innerHTML = '';
-  document.getElementById('hud-tr').innerHTML = '';
-  document.getElementById('hud-bl').innerHTML = '';
-  document.getElementById('frame-counter').textContent = '';
-  document.getElementById('safety-alert').style.display = 'none';
-
-  document.getElementById('s-objects').textContent = '—';
-  document.getElementById('s-risk').textContent = '—';
-  document.getElementById('s-ms').textContent = '—';
-  document.getElementById('s-risk').style.color = 'var(--cyan)';
-  document.getElementById('phase-name').textContent = 'AWAITING ANALYSIS';
-  document.getElementById('phase-desc').textContent = 'Upload an endoscopic image or video frame to begin.';
-  document.getElementById('phase-badge').textContent = 'IDLE';
-  document.getElementById('det-list').innerHTML = '<div style="padding:12px;font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);text-align:center;line-height:2;">No structures detected yet.<br/>Run analysis to populate.</div>';
-  document.getElementById('warnings-list').innerHTML = '<div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);line-height:2;">No active warnings.</div>';
-  document.getElementById('warn-badge').textContent = 'CLEAR';
-  document.getElementById('warn-badge').style.cssText = 'background:rgba(0,255,136,0.1);color:var(--green);border-color:var(--green-dim)';
-  setEngineStatus(apiKey ? 'ready' : 'off');
-  log('Scene cleared.', 'info');
+  if(videoEl){videoEl.pause();videoEl.src='';videoEl=null;}
+  currentFrameData=null;lastAnalysis=null;isPlaying=false;frameCount=0;
+  document.getElementById('drop-zone').style.display='flex';
+  document.getElementById('canvas-wrap').style.display='none';
+  document.getElementById('scrubber').classList.remove('on');
+  document.getElementById('analyze-btn').disabled=true;
+  ['safety-flash','safety-lbl'].forEach(id=>document.getElementById(id).classList.remove('on'));
+  setBadge('feed-badge','IDLE','bd');
+  document.getElementById('hud-tl').innerHTML='';document.getElementById('hud-tr').innerHTML='';document.getElementById('frame-tc').textContent='';
+  ['s-obj','s-risk','s-ms','s-conf'].forEach(id=>{document.getElementById(id).textContent='—';document.getElementById(id).className='sval';});
+  document.getElementById('phase-name').textContent='AWAITING';
+  document.getElementById('phase-desc').textContent='Upload a frame to detect surgical phase.';
+  setBadge('phase-badge','IDLE','bd');
+  document.getElementById('det-list').innerHTML='<div class="emsg">No structures detected.<br/>Run analysis to populate.</div>';
+  document.getElementById('det-badge').textContent='0';
+  document.getElementById('warn-list').innerHTML='<div class="wrow info"><span>No active warnings.</span></div>';
+  setBadge('warn-badge','CLEAR','bg');
+  setStatus(apiKey?'ready':'off');
+  log('Scene cleared.','info');
 }
 
-// ════════════════════════════════════════
-//  INIT LOG
-// ════════════════════════════════════════
-log('SurgiVision OS v2.2 initialized.', 'ok');
-log('Intraoperative Intelligence Engine: Groq · Llama 4 Scout Vision (free)', 'info');
-log('Capabilities: scene perception · phase detection · safety assessment', 'info');
-log('Compatible: CholecSeg8k · Endoscapes2023 · CholecT45 · SurgiSR4K', 'info');
-log('Drop an endoscopic image or video to begin.', 'data');
-
-if (!apiKey) {
-  setEngineStatus('off');
-  log('No API key detected. Enter key in topbar to activate engine.', 'warn');
-} else {
-  setEngineStatus('ready');
-  log('API key restored from session. Engine ready.', 'ok');
-}
+log('SurgiVision OS v3.0 initialized.','ok');
+log('Engine: Groq · Llama 4 Scout Vision · Free tier','info');
+log('Drop a CholecSeg8k _endo.png frame to begin.','data');
+if (!apiKey){setStatus('off');log('No API key — enter your Groq gsk_ key above.','warn');}
+else{setStatus('ready');log('API key restored. Engine ready.','ok');}
 </script>
 </body>
 </html>
