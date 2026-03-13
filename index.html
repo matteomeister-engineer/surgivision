@@ -1064,14 +1064,14 @@ body::after {
   <div id="bottombar">
     <div id="ticker">
       <div id="ticker-inner">
-        <span class="tick-item">MODEL<span>llama-3.2-11b-vision</span></span>
+        <span class="tick-item">MODEL<span>llama-4-scout-17b</span></span>
         <span class="tick-item">ENGINE<span>GROQ (FREE)</span></span>
         <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
         <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
         <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
         <span class="tick-item">VERSION<span>2.2.0</span></span>
         <!-- duplicate for seamless loop -->
-        <span class="tick-item">MODEL<span>llama-3.2-11b-vision</span></span>
+        <span class="tick-item">MODEL<span>llama-4-scout-17b</span></span>
         <span class="tick-item">ENGINE<span>GROQ (FREE)</span></span>
         <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
         <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
@@ -1436,7 +1436,7 @@ async function analyzeCurrentFrame() {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'llama-3.2-11b-vision-preview',
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           max_tokens: 1500,
           temperature: 0.2,
           messages: [{
@@ -1743,7 +1743,7 @@ function clearScene() {
 //  INIT LOG
 // ════════════════════════════════════════
 log('SurgiVision OS v2.2 initialized.', 'ok');
-log('Intraoperative Intelligence Engine: Groq · LLaMA 3.2 Vision (free)', 'info');
+log('Intraoperative Intelligence Engine: Groq · Llama 4 Scout Vision (free)', 'info');
 log('Capabilities: scene perception · phase detection · safety assessment', 'info');
 log('Compatible: CholecSeg8k · Endoscapes2023 · CholecT45 · SurgiSR4K', 'info');
 log('Drop an endoscopic image or video to begin.', 'data');
