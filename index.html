@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SurgiVision OS · Intraoperative Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+/* ═══════════════════════════════════════
+   DESIGN SYSTEM — Surgical HUD
+═══════════════════════════════════════ */
+:root {
+  --ink:       #040810;
+  --deep:      #060c14;
+  --panel:     #080f1a;
+  --surface:   #0c1624;
+  --line:      #112030;
+  --line2:     #1a3048;
+
+  --cyan:      #00d4ff;
+  --cyan-dim:  #0088aa;
+  --green:     #00ff88;
+  --green-dim: #008844;
+  --red:       #ff3355;
+  --amber:     #ffaa00;
+  --white:     #e8f4ff;
+  --muted:     #3a6080;
+
+  /* Tissue / anatomy colors */
+  --liver:     rgba(180, 60, 40, 0.75);
+  --gallbladder: rgba(80, 160, 60, 0.75);
+  --vessel:    rgba(220, 50, 80, 0.75);
+  --fat:       rgba(220, 180, 60, 0.75);
+  --instrument: rgba(80, 180, 220, 0.75);
+  --critical:  rgba(255, 50, 50, 0.85);
+
+  --font-display: 'Orbitron', monospace;
+  --font-mono:    'IBM Plex Mono', monospace;
+  --font-body:    'IBM Plex Sans', sans-serif;
+
+  --radius: 2px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--white);
+  font-family: var(--font-body);
+}
+
+/* ── Scanline texture ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px, transparent 3px,
+    rgba(0, 212, 255, 0.008) 3px, rgba(0, 212, 255, 0.008) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ══════════════════════
+   LAYOUT
+══════════════════════ */
+#app {
+  display: grid;
+  grid-template-rows: 52px 1fr 40px;
+  grid-template-columns: 1fr 300px;
+  height: 100vh;
+  gap: 0;
+}
+
+/* ══════════════════════
+   TOPBAR
+══════════════════════ */
+#topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--line2);
+  background: var(--deep);
+  padding: 0;
+  overflow: hidden;
+}
+
+.tb-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  border-right: 1px solid var(--line2);
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.tb-logo-text {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  color: var(--white);
+}
+
+.tb-logo-text span { color: var(--cyan); }
+
+.tb-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--line2);
+  margin: 0 2px;
+}
+
+.tb-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 16px;
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  text-transform: uppercase;
+  transition: all 0.15s;
+  white-space: nowrap;
+  border-right: 1px solid transparent;
+}
+
+.tb-btn:hover { color: var(--cyan); background: rgba(0,212,255,0.04); }
+
+.tb-btn.active {
+  color: var(--cyan);
+  background: rgba(0,212,255,0.06);
+  border-bottom: 2px solid var(--cyan);
+}
+
+.tb-btn .icon { font-size: 0.9rem; }
+
+.tb-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 100%;
+  border-left: 1px solid var(--line2);
+}
+
+.tb-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  border-right: 1px solid var(--line2);
+  height: 100%;
+}
+
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: breathe 2.5s ease-in-out infinite;
+}
+.dot.amber { background: var(--amber); }
+.dot.red { background: var(--red); animation: blink-fast 0.5s steps(1) infinite; }
+.dot.off { background: var(--muted); animation: none; }
+
+@keyframes breathe {
+  0%,100% { opacity: 1; box-shadow: 0 0 6px var(--green); }
+  50% { opacity: 0.4; box-shadow: none; }
+}
+@keyframes blink-fast { 50% { opacity: 0; } }
+
+/* API key input inline */
+#api-key-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 100%;
+}
+
+#api-key-input {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  width: 200px;
+  padding: 5px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  color: var(--white);
+  outline: none;
+  letter-spacing: 0.05em;
+}
+
+#api-key-input:focus { border-color: var(--cyan); }
+#api-key-input::placeholder { color: var(--muted); }
+
+.tb-save-btn {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  padding: 5px 10px;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid var(--cyan-dim);
+  color: var(--cyan);
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  transition: all 0.15s;
+}
+.tb-save-btn:hover { background: rgba(0,212,255,0.18); }
+
+/* ══════════════════════
+   MAIN VIEWPORT
+══════════════════════ */
+#viewport {
+  position: relative;
+  background: #020609;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* HUD corner brackets */
+#viewport::before, #viewport::after {
+  content: '';
+  position: absolute;
+  width: 40px; height: 40px;
+  border-color: var(--cyan);
+  border-style: solid;
+  opacity: 0.3;
+  z-index: 5;
+  pointer-events: none;
+}
+#viewport::before {
+  top: 16px; left: 16px;
+  border-width: 2px 0 0 2px;
+}
+#viewport::after {
+  bottom: 16px; right: 16px;
+  border-width: 0 2px 2px 0;
+}
+
+/* Drop zone */
+#drop-zone {
+  position: absolute;
+  inset: 40px;
+  border: 1px dashed var(--line2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+#drop-zone:hover, #drop-zone.drag { border-color: var(--cyan); background: rgba(0,212,255,0.02); }
+
+.dz-icon {
+  width: 72px; height: 72px;
+  opacity: 0.12;
+}
+
+.dz-title {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--cyan);
+  text-transform: uppercase;
+}
+
+.dz-sub {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 2;
+}
+
+/* Dataset links */
+.dataset-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.chip {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  padding: 4px 10px;
+  border: 1px solid var(--line2);
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  transition: all 0.15s;
+}
+.chip:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* Canvas container */
+#canvas-wrap {
+  position: relative;
+  display: none;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#base-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 132px);
+}
+
+#overlay-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+/* ── HUD overlays on viewport ── */
+#hud-tl {
+  position: absolute;
+  top: 16px; left: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--cyan);
+  line-height: 1.9;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#hud-tr {
+  position: absolute;
+  top: 16px; right: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--green);
+  text-align: right;
+  line-height: 1.9;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#hud-bl {
+  position: absolute;
+  bottom: 16px; left: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--muted);
+  line-height: 1.9;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#frame-counter {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: 0.15em;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Safety alert flash */
+#safety-alert {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 0.3em;
+  color: var(--red);
+  text-shadow: 0 0 20px var(--red);
+  display: none;
+  z-index: 20;
+  text-align: center;
+  pointer-events: none;
+  animation: flash-alert 0.8s ease infinite;
+}
+
+@keyframes flash-alert {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Processing overlay */
+#processing {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 16, 0.82);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 30;
+  backdrop-filter: blur(2px);
+}
+#processing.active { display: flex; }
+
+.proc-ring {
+  width: 52px; height: 52px;
+  position: relative;
+}
+
+.proc-ring::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--cyan);
+  animation: spin 0.9s linear infinite;
+}
+
+.proc-ring::after {
+  content: '';
+  position: absolute; inset: 8px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  border-top-color: var(--green);
+  animation: spin 0.6s linear infinite reverse;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.proc-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--cyan);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.proc-sub {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--muted);
+  animation: blink 1.2s steps(1) infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ══════════════════════
+   VIDEO SCRUBBER
+══════════════════════ */
+#scrubber-bar {
+  display: none;
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 56px;
+  background: linear-gradient(to top, rgba(4,8,16,0.95), transparent);
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 8px;
+  z-index: 15;
+}
+
+#scrubber-bar.visible { display: flex; }
+
+.scrub-btn {
+  width: 28px; height: 28px;
+  border: 1px solid var(--line2);
+  background: rgba(0,212,255,0.06);
+  color: var(--cyan);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.scrub-btn:hover { background: rgba(0,212,255,0.18); border-color: var(--cyan); }
+
+#timeline {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--line2);
+  outline: none;
+  cursor: pointer;
+  border-radius: 0;
+}
+#timeline::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  background: var(--cyan);
+  border-radius: 0;
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+.scrub-time {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--cyan);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Analyze frame btn */
+#analyze-frame-btn {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  padding: 6px 12px;
+  border: 1px solid var(--cyan-dim);
+  background: rgba(0,212,255,0.08);
+  color: var(--cyan);
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+#analyze-frame-btn:hover { background: rgba(0,212,255,0.18); }
+#analyze-frame-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ══════════════════════
+   RIGHT PANEL
+══════════════════════ */
+#panel {
+  border-left: 1px solid var(--line2);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  grid-row: 2;
+}
+
+/* Stat strip */
+#stat-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--line2);
+  flex-shrink: 0;
+}
+
+.stat {
+  padding: 10px 12px;
+  border-right: 1px solid var(--line2);
+  text-align: center;
+}
+.stat:last-child { border-right: none; }
+
+.stat-val {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--cyan);
+  display: block;
+  line-height: 1;
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Panel sections */
+.p-section {
+  border-bottom: 1px solid var(--line2);
+  flex-shrink: 0;
+}
+
+.p-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border-bottom: 1px solid var(--line);
+}
+
+.p-head-badge {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  padding: 2px 6px;
+  background: rgba(0,212,255,0.1);
+  color: var(--cyan);
+  border: 1px solid var(--cyan-dim);
+}
+
+/* Surgical phase */
+#phase-display {
+  padding: 10px 12px;
+}
+
+#phase-name {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--green);
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+
+#phase-desc {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* Detection list */
+#det-list {
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line2) transparent;
+}
+
+.det-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.1s;
+  animation: rowIn 0.25s ease both;
+}
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.det-row:hover { background: rgba(0,212,255,0.04); }
+.det-row.critical-row { background: rgba(255,51,85,0.06); }
+.det-row.critical-row:hover { background: rgba(255,51,85,0.1); }
+
+.det-swatch {
+  width: 8px; height: 8px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.det-info { flex: 1; min-width: 0; }
+
+.det-name {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.det-type {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.det-conf-val {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.det-conf-bar {
+  height: 2px;
+  background: var(--line);
+  margin-top: 3px;
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.det-conf-fill {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 0.4s ease;
+}
+
+/* Safety warnings */
+#warnings-list {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.warning-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--amber);
+  line-height: 1.5;
+  animation: rowIn 0.2s ease both;
+}
+
+.warning-item.critical { color: var(--red); }
+
+.w-icon { flex-shrink: 0; font-size: 0.75rem; margin-top: 1px; }
+
+/* Log */
+#log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line2) transparent;
+}
+
+.log-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  line-height: 1.7;
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.log-time { color: var(--line2); flex-shrink: 0; }
+.log-row.info .log-msg { color: var(--muted); }
+.log-row.ok   .log-msg { color: var(--green); }
+.log-row.warn .log-msg { color: var(--amber); }
+.log-row.err  .log-msg { color: var(--red); }
+.log-row.data .log-msg { color: var(--cyan); }
+
+/* ══════════════════════
+   BOTTOM BAR
+══════════════════════ */
+#bottombar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-top: 1px solid var(--line2);
+  background: var(--deep);
+  padding: 0 16px;
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  overflow: hidden;
+}
+
+#ticker {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+#ticker-inner {
+  display: flex;
+  gap: 48px;
+  animation: ticker 30s linear infinite;
+  white-space: nowrap;
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.tick-item { color: var(--muted); }
+.tick-item span { color: var(--cyan); margin-left: 6px; }
+
+#clock {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--cyan);
+  letter-spacing: 0.1em;
+  border-left: 1px solid var(--line2);
+  padding-left: 16px;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════
+   MODAL — no key
+══════════════════════ */
+#modal-bg {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(4,8,16,0.92);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#modal-bg.active { display: flex; }
+
+#modal {
+  background: var(--panel);
+  border: 1px solid var(--line2);
+  padding: 32px;
+  max-width: 440px;
+  width: 90%;
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--cyan);
+  margin-bottom: 16px;
+}
+
+.modal-body {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--muted);
+  line-height: 2;
+  margin-bottom: 20px;
+}
+
+.modal-body a { color: var(--cyan); text-decoration: none; }
+
+.modal-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  color: var(--white);
+  outline: none;
+  margin-bottom: 12px;
+  letter-spacing: 0.05em;
+}
+.modal-input:focus { border-color: var(--cyan); }
+
+.modal-row {
+  display: flex;
+  gap: 10px;
+}
+
+.modal-btn {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 10px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+.modal-btn:hover { border-color: var(--muted); color: var(--white); }
+.modal-btn.primary {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(0,212,255,0.06);
+}
+.modal-btn.primary:hover { background: rgba(0,212,255,0.15); }
+
+/* ══════════════════════
+   SCROLLBARS
+══════════════════════ */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
+
+/* hidden inputs */
+#file-input { display: none; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ══ TOPBAR ══ -->
+  <div id="topbar">
+    <div class="tb-logo">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <circle cx="11" cy="11" r="10" stroke="#00d4ff" stroke-width="1" stroke-dasharray="3 2"/>
+        <circle cx="11" cy="11" r="5" stroke="#00ff88" stroke-width="0.8"/>
+        <circle cx="11" cy="11" r="2" fill="#00d4ff"/>
+        <line x1="1" y1="11" x2="6" y2="11" stroke="#00d4ff" stroke-width="0.8"/>
+        <line x1="16" y1="11" x2="21" y2="11" stroke="#00d4ff" stroke-width="0.8"/>
+        <line x1="11" y1="1" x2="11" y2="6" stroke="#00d4ff" stroke-width="0.8"/>
+        <line x1="11" y1="16" x2="11" y2="21" stroke="#00d4ff" stroke-width="0.8"/>
+      </svg>
+      <span class="tb-logo-text">SURGI<span>VISION</span></span>
+    </div>
+
+    <button class="tb-btn active" onclick="triggerUpload('image')">
+      <span class="icon">⊞</span> IMAGE
+    </button>
+    <button class="tb-btn" onclick="triggerUpload('video')">
+      <span class="icon">▶</span> VIDEO
+    </button>
+    <div class="tb-divider"></div>
+    <button class="tb-btn" id="analyze-btn" onclick="analyzeCurrentFrame()" disabled>
+      <span class="icon">◈</span> ANALYZE FRAME
+    </button>
+    <button class="tb-btn" onclick="clearScene()">
+      <span class="icon">✕</span> CLEAR
+    </button>
+
+    <div class="tb-right">
+      <div class="tb-status">
+        <div class="dot" id="engine-dot"></div>
+        <span id="engine-label">CLAUDE VISION</span>
+      </div>
+      <div id="api-key-wrap">
+        <input id="api-key-input" type="password" placeholder="sk-ant-api... (Anthropic API key)"/>
+        <button class="tb-save-btn" onclick="saveKey()">SAVE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ VIEWPORT ══ -->
+  <div id="viewport">
+
+    <!-- Drop zone -->
+    <div id="drop-zone" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" onclick="triggerUpload('image')">
+      <svg class="dz-icon" viewBox="0 0 72 72" fill="none">
+        <rect x="8" y="16" width="56" height="44" rx="2" stroke="#00d4ff" stroke-width="1.5"/>
+        <circle cx="26" cy="32" r="6" stroke="#00d4ff" stroke-width="1.2"/>
+        <path d="M8 46l14-12 10 8 12-14 20 18" stroke="#00ff88" stroke-width="1.2" stroke-linejoin="round"/>
+        <path d="M36 6v18M31 10l5-4 5 4" stroke="#00d4ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="dz-title">Drop surgical footage here</div>
+      <div class="dz-sub">
+        Endoscopic · Laparoscopic · Robotic (da Vinci) · Image or Video<br/>
+        PNG · JPG · MP4 · MOV · WEBM
+      </div>
+      <div class="dataset-chips">
+        <span style="font-family:var(--font-mono);font-size:0.58rem;color:var(--muted);letter-spacing:0.06em;">FREE DATASETS:</span>
+        <a class="chip" href="https://www.kaggle.com/datasets/newslab/cholecseg8k" target="_blank">CholecSeg8k ↗</a>
+        <a class="chip" href="https://github.com/CAMMA-public/Endoscapes" target="_blank">Endoscapes2023 ↗</a>
+        <a class="chip" href="https://github.com/CAMMA-public/cholect50" target="_blank">CholecT45 ↗</a>
+        <a class="chip" href="https://arxiv.org/abs/2507.00209" target="_blank">SurgiSR4K ↗</a>
+      </div>
+    </div>
+
+    <!-- Canvas -->
+    <div id="canvas-wrap">
+      <canvas id="base-canvas"></canvas>
+      <canvas id="overlay-canvas"></canvas>
+    </div>
+
+    <!-- HUD overlays -->
+    <div id="hud-tl"></div>
+    <div id="hud-tr"></div>
+    <div id="hud-bl"></div>
+    <div id="frame-counter"></div>
+    <div id="safety-alert">⚠ CRITICAL STRUCTURE PROXIMITY</div>
+
+    <!-- Processing -->
+    <div id="processing">
+      <div class="proc-ring"></div>
+      <div class="proc-label">RUNNING SCENE PERCEPTION</div>
+      <div class="proc-sub" id="proc-step">Sending frame to Claude Vision API...</div>
+    </div>
+
+    <!-- Video scrubber -->
+    <div id="scrubber-bar">
+      <button class="scrub-btn" id="play-btn" onclick="togglePlay()">▶</button>
+      <input type="range" id="timeline" min="0" max="100" value="0" step="0.1" oninput="seekVideo(this.value)"/>
+      <span class="scrub-time" id="time-display">0:00 / 0:00</span>
+      <button id="analyze-frame-btn" onclick="analyzeCurrentFrame()" disabled>◈ ANALYZE FRAME</button>
+    </div>
+  </div>
+
+  <!-- ══ RIGHT PANEL ══ -->
+  <div id="panel">
+    <!-- Stats -->
+    <div id="stat-strip">
+      <div class="stat">
+        <span class="stat-val" id="s-objects">—</span>
+        <span class="stat-label">Structures</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val" id="s-risk">—</span>
+        <span class="stat-label">Risk Level</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val" id="s-ms">—</span>
+        <span class="stat-label">API ms</span>
+      </div>
+    </div>
+
+    <!-- Surgical Phase -->
+    <div class="p-section">
+      <div class="p-head">
+        Surgical Phase
+        <span class="p-head-badge" id="phase-badge">IDLE</span>
+      </div>
+      <div id="phase-display">
+        <div id="phase-name">AWAITING ANALYSIS</div>
+        <div id="phase-desc">Upload an endoscopic image or video frame to begin intraoperative scene perception.</div>
+      </div>
+    </div>
+
+    <!-- Detected Structures -->
+    <div class="p-section">
+      <div class="p-head">
+        Detected Structures
+        <span class="p-head-badge" id="det-badge">0</span>
+      </div>
+      <div id="det-list">
+        <div style="padding:12px;font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);text-align:center;line-height:2;">
+          No structures detected yet.<br/>Run analysis to populate.
+        </div>
+      </div>
+    </div>
+
+    <!-- Safety Warnings -->
+    <div class="p-section">
+      <div class="p-head">
+        Safety Assessment
+        <span class="p-head-badge" id="warn-badge" style="background:rgba(0,255,136,0.1);color:var(--green);border-color:var(--green-dim);">CLEAR</span>
+      </div>
+      <div id="warnings-list">
+        <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);line-height:2;">
+          No active warnings.
+        </div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="p-head" style="border-bottom:1px solid var(--line2);flex-shrink:0;">
+      System Log
+    </div>
+    <div id="log"></div>
+  </div>
+
+  <!-- ══ BOTTOM BAR ══ -->
+  <div id="bottombar">
+    <div id="ticker">
+      <div id="ticker-inner">
+        <span class="tick-item">MODEL<span>claude-sonnet-4-20250514</span></span>
+        <span class="tick-item">RUNTIME<span>BROWSER-NATIVE</span></span>
+        <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
+        <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
+        <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
+        <span class="tick-item">VERSION<span>2.0.0</span></span>
+        <!-- duplicate for seamless loop -->
+        <span class="tick-item">MODEL<span>claude-sonnet-4-20250514</span></span>
+        <span class="tick-item">RUNTIME<span>BROWSER-NATIVE</span></span>
+        <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
+        <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
+        <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
+        <span class="tick-item">VERSION<span>2.0.0</span></span>
+      </div>
+    </div>
+    <div id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- Hidden inputs -->
+<input type="file" id="file-input" accept="image/*,video/*"/>
+
+<!-- ══ MODAL ══ -->
+<div id="modal-bg">
+  <div id="modal">
+    <div class="modal-title">API KEY REQUIRED</div>
+    <div class="modal-body">
+      SurgiVision uses the <strong style="color:var(--white)">Anthropic Claude Vision API</strong> for surgical scene perception.<br/><br/>
+      Enter your API key to enable AI analysis. Your key is stored only in your browser's sessionStorage and never sent anywhere except directly to Anthropic.<br/><br/>
+      Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com ↗</a>
+    </div>
+    <input class="modal-input" id="modal-key-input" type="password" placeholder="sk-ant-api03-..."/>
+    <div class="modal-row">
+      <button class="modal-btn" onclick="closeModal()">CANCEL</button>
+      <button class="modal-btn primary" onclick="saveKeyFromModal()">ACTIVATE ENGINE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+let apiKey = sessionStorage.getItem('sv_key') || '';
+let currentMode = null; // 'image' | 'video'
+let videoEl = null;
+let isPlaying = false;
+let currentFrameData = null;
+let lastAnalysis = null;
+let frameCount = 0;
+
+// Restore key to input
+if (apiKey) {
+  document.getElementById('api-key-input').value = apiKey;
+  setEngineStatus('ready');
+}
+
+// ════════════════════════════════════════
+//  CLOCK
+// ════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ════════════════════════════════════════
+//  LOGGING
+// ════════════════════════════════════════
+function log(msg, type='info') {
+  const area = document.getElementById('log');
+  const now = new Date();
+  const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const row = document.createElement('div');
+  row.className = `log-row ${type}`;
+  row.innerHTML = `<span class="log-time">${ts}</span><span class="log-msg">${msg}</span>`;
+  area.appendChild(row);
+  area.scrollTop = area.scrollHeight;
+}
+
+// ════════════════════════════════════════
+//  ENGINE STATUS
+// ════════════════════════════════════════
+function setEngineStatus(state) {
+  const dot = document.getElementById('engine-dot');
+  const lbl = document.getElementById('engine-label');
+  dot.className = 'dot';
+  if (state === 'ready') { dot.classList.add(''); lbl.textContent = 'ENGINE READY'; }
+  else if (state === 'running') { dot.classList.add('amber'); lbl.textContent = 'ANALYZING...'; }
+  else if (state === 'error') { dot.classList.add('red'); lbl.textContent = 'ENGINE ERROR'; }
+  else { dot.classList.add('off'); lbl.textContent = 'NO API KEY'; }
+}
+
+// ════════════════════════════════════════
+//  API KEY
+// ════════════════════════════════════════
+function saveKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val) return;
+  apiKey = val;
+  sessionStorage.setItem('sv_key', val);
+  setEngineStatus('ready');
+  log('API key saved. Engine ready.', 'ok');
+}
+
+function saveKeyFromModal() {
+  const val = document.getElementById('modal-key-input').value.trim();
+  if (!val) { log('No API key entered.', 'warn'); return; }
+  apiKey = val;
+  sessionStorage.setItem('sv_key', val);
+  document.getElementById('api-key-input').value = val;
+  setEngineStatus('ready');
+  closeModal();
+  log('API key activated. Proceeding with analysis.', 'ok');
+  analyzeCurrentFrame();
+}
+
+function closeModal() { document.getElementById('modal-bg').classList.remove('active'); }
+
+// ════════════════════════════════════════
+//  FILE UPLOAD
+// ════════════════════════════════════════
+function triggerUpload(type) {
+  const input = document.getElementById('file-input');
+  input.accept = type === 'video' ? 'video/*' : 'image/*,video/*';
+  input.click();
+}
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+  handleFile(file);
+});
+
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+function onDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag'); }
+function onDragLeave() { document.getElementById('drop-zone').classList.remove('drag'); }
+
+function handleFile(file) {
+  const isVideo = file.type.startsWith('video/');
+  log(`Loading ${isVideo ? 'video' : 'image'}: ${file.name}`, 'info');
+  if (isVideo) loadVideo(file);
+  else loadImage(file);
+}
+
+// ════════════════════════════════════════
+//  IMAGE LOADING
+// ════════════════════════════════════════
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      currentMode = 'image';
+      if (videoEl) { videoEl.pause(); videoEl = null; }
+      showCanvas();
+      renderImageToCanvas(img);
+      document.getElementById('scrubber-bar').classList.remove('visible');
+      document.getElementById('analyze-btn').disabled = false;
+      document.getElementById('analyze-frame-btn').disabled = false;
+      log(`Image ready: ${img.width}×${img.height}px`, 'ok');
+      analyzeCurrentFrame();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderImageToCanvas(img) {
+  const base = document.getElementById('base-canvas');
+  const vp = document.getElementById('viewport');
+  const maxW = vp.clientWidth - 80;
+  const maxH = vp.clientHeight - 80;
+  const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+  base.width = Math.round(img.width * scale);
+  base.height = Math.round(img.height * scale);
+  base.getContext('2d').drawImage(img, 0, 0, base.width, base.height);
+  syncOverlay();
+  captureFrameData();
+  updateHUD(img.width, img.height);
+}
+
+// ════════════════════════════════════════
+//  VIDEO LOADING
+// ════════════════════════════════════════
+function loadVideo(file) {
+  currentMode = 'video';
+  if (videoEl) { videoEl.pause(); videoEl.src = ''; }
+
+  videoEl = document.createElement('video');
+  videoEl.src = URL.createObjectURL(file);
+  videoEl.muted = true;
+  videoEl.playsInline = true;
+  videoEl.preload = 'auto';
+
+  videoEl.addEventListener('loadedmetadata', () => {
+    showCanvas();
+    setupVideoCanvas();
+    document.getElementById('scrubber-bar').classList.add('visible');
+    document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('analyze-frame-btn').disabled = false;
+    document.getElementById('timeline').max = videoEl.duration;
+    log(`Video ready: ${videoEl.videoWidth}×${videoEl.videoHeight} · ${formatTime(videoEl.duration)}`, 'ok');
+    renderVideoFrame();
+  });
+
+  videoEl.addEventListener('timeupdate', () => {
+    document.getElementById('timeline').value = videoEl.currentTime;
+    document.getElementById('time-display').textContent =
+      `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration)}`;
+    renderVideoFrame();
+  });
+
+  videoEl.addEventListener('ended', () => {
+    isPlaying = false;
+    document.getElementById('play-btn').textContent = '▶';
+  });
+}
+
+function setupVideoCanvas() {
+  const base = document.getElementById('base-canvas');
+  const vp = document.getElementById('viewport');
+  const maxW = vp.clientWidth - 80;
+  const maxH = vp.clientHeight - 120;
+
+  videoEl.addEventListener('loadeddata', () => {
+    const scale = Math.min(maxW / videoEl.videoWidth, maxH / videoEl.videoHeight, 1);
+    base.width = Math.round(videoEl.videoWidth * scale);
+    base.height = Math.round(videoEl.videoHeight * scale);
+    syncOverlay();
+    updateHUD(videoEl.videoWidth, videoEl.videoHeight);
+  }, { once: true });
+}
+
+function renderVideoFrame() {
+  const base = document.getElementById('base-canvas');
+  if (!base.width) return;
+  base.getContext('2d').drawImage(videoEl, 0, 0, base.width, base.height);
+  captureFrameData();
+  frameCount++;
+  document.getElementById('frame-counter').textContent =
+    `FRAME ${frameCount} · ${formatTime(videoEl?.currentTime || 0)}`;
+}
+
+function togglePlay() {
+  if (!videoEl) return;
+  if (isPlaying) {
+    videoEl.pause();
+    document.getElementById('play-btn').textContent = '▶';
+  } else {
+    videoEl.play();
+    document.getElementById('play-btn').textContent = '⏸';
+  }
+  isPlaying = !isPlaying;
+}
+
+function seekVideo(val) {
+  if (videoEl) {
+    videoEl.currentTime = parseFloat(val);
+    renderVideoFrame();
+  }
+}
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+// ════════════════════════════════════════
+//  CANVAS UTILS
+// ════════════════════════════════════════
+function showCanvas() {
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('canvas-wrap').style.display = 'block';
+}
+
+function syncOverlay() {
+  const base = document.getElementById('base-canvas');
+  const ov = document.getElementById('overlay-canvas');
+  ov.width = base.width;
+  ov.height = base.height;
+}
+
+function captureFrameData() {
+  const base = document.getElementById('base-canvas');
+  currentFrameData = base.toDataURL('image/jpeg', 0.85).split(',')[1];
+}
+
+function updateHUD(w, h) {
+  document.getElementById('hud-tl').innerHTML =
+    `SURGIVISION OS v2.0<br>INTRAOP INTELLIGENCE<br>RES ${w}×${h}`;
+  document.getElementById('hud-tr').innerHTML =
+    `ENGINE: CLAUDE VISION<br>MODE: SCENE PERCEPTION<br>STATUS: READY`;
+  document.getElementById('hud-bl').innerHTML =
+    `CAMMA · CHOLEC80 · ENDOSCAPES`;
+}
+
+// ════════════════════════════════════════
+//  CLAUDE VISION API CALL
+// ════════════════════════════════════════
+const SYSTEM_PROMPT = `You are an intraoperative surgical AI vision system analyzing endoscopic or laparoscopic surgery footage. Your task is to perform surgical scene perception in real time.
+
+Analyze the provided frame and return ONLY a valid JSON object (no markdown, no explanation) with this exact structure:
+
+{
+  "phase": {
+    "name": "Phase name (e.g. Dissection, Clipping, Calot Triangle Dissection, Hemostasis, Extraction, etc.)",
+    "description": "Brief description of what is happening in this surgical phase"
+  },
+  "structures": [
+    {
+      "label": "Structure name",
+      "type": "anatomy | instrument | tissue | fluid | other",
+      "confidence": 0.0-1.0,
+      "location": "descriptive location in frame (e.g. center-left, upper quadrant)",
+      "bbox": [x_percent, y_percent, width_percent, height_percent],
+      "color": "#hexcolor matching the structure type"
+    }
+  ],
+  "warnings": [
+    {
+      "severity": "critical | warning | info",
+      "message": "Warning message about safety, proximity, or observation"
+    }
+  ],
+  "summary": "1-2 sentence overall scene summary for the surgeon"
+}
+
+Use these colors: liver=#c43020, gallbladder=#40a040, vessel=#e03050, fat=#d0b040, instrument=#40b0d0, bleeding=#ff2040, bile=#80c040, other=#8080c0.
+If the image is not a surgical/medical image, still attempt analysis of what you see using the same format.
+Return ONLY the JSON object.`;
+
+async function analyzeCurrentFrame() {
+  if (!currentFrameData) { log('No frame data available.', 'warn'); return; }
+
+  if (!apiKey) {
+    document.getElementById('modal-bg').classList.add('active');
+    return;
+  }
+
+  const proc = document.getElementById('processing');
+  const step = document.getElementById('proc-step');
+  proc.classList.add('active');
+  setEngineStatus('running');
+  step.textContent = 'Sending frame to Claude Vision API...';
+
+  const t0 = performance.now();
+  log('Initiating scene perception analysis...', 'data');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: [{
+            type: 'image',
+            source: { type: 'base64', media_type: 'image/jpeg', data: currentFrameData }
+          }, {
+            type: 'text',
+            text: 'Analyze this surgical frame. Return JSON only.'
+          }]
+        }]
+      })
+    });
+
+    const elapsed = Math.round(performance.now() - t0);
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '';
+
+    step.textContent = 'Parsing perception output...';
+
+    // Parse JSON — strip any accidental markdown
+    let analysis;
+    try {
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+      analysis = JSON.parse(cleaned);
+    } catch (pe) {
+      throw new Error(`JSON parse failed: ${pe.message}\nRaw: ${raw.slice(0,200)}`);
+    }
+
+    lastAnalysis = analysis;
+    log(`Analysis complete in ${elapsed}ms — ${(analysis.structures||[]).length} structures detected.`, 'ok');
+
+    renderAnalysis(analysis, elapsed);
+    setEngineStatus('ready');
+
+  } catch(e) {
+    log(`Error: ${e.message}`, 'err');
+    setEngineStatus('error');
+    document.getElementById('phase-name').textContent = 'ANALYSIS FAILED';
+    document.getElementById('phase-desc').textContent = e.message;
+  }
+
+  proc.classList.remove('active');
+}
+
+// ════════════════════════════════════════
+//  RENDER ANALYSIS
+// ════════════════════════════════════════
+function renderAnalysis(a, ms) {
+  const structures = a.structures || [];
+  const warnings = a.warnings || [];
+  const phase = a.phase || {};
+
+  // Stats
+  document.getElementById('s-objects').textContent = structures.length;
+  document.getElementById('s-ms').textContent = ms;
+
+  const hasCritical = warnings.some(w => w.severity === 'critical');
+  const hasWarning  = warnings.some(w => w.severity === 'warning');
+  const riskEl = document.getElementById('s-risk');
+  if (hasCritical)     { riskEl.textContent = 'HIGH'; riskEl.style.color = 'var(--red)'; }
+  else if (hasWarning) { riskEl.textContent = 'MED';  riskEl.style.color = 'var(--amber)'; }
+  else                 { riskEl.textContent = 'LOW';  riskEl.style.color = 'var(--green)'; }
+
+  // Phase
+  document.getElementById('phase-name').textContent = (phase.name || 'Unknown').toUpperCase();
+  document.getElementById('phase-desc').textContent = phase.description || '';
+  document.getElementById('phase-badge').textContent = 'ACTIVE';
+
+  // Surgical phase summary as log
+  if (a.summary) log(a.summary, 'data');
+
+  // Overlay
+  drawOverlay(structures, warnings);
+
+  // Detection list
+  renderDetList(structures);
+
+  // Warnings panel
+  renderWarnings(warnings);
+
+  // Safety alert flash
+  const alertEl = document.getElementById('safety-alert');
+  if (hasCritical) {
+    alertEl.style.display = 'block';
+    setTimeout(() => { alertEl.style.display = 'none'; }, 4000);
+  }
+
+  // HUD right update
+  document.getElementById('hud-tr').innerHTML =
+    `PHASE: ${(phase.name||'?').toUpperCase()}<br>STRUCTS: ${structures.length}<br>RISK: ${hasCritical?'⚠ HIGH':hasWarning?'◈ MED':'✓ LOW'}`;
+}
+
+// ════════════════════════════════════════
+//  CANVAS OVERLAY
+// ════════════════════════════════════════
+function drawOverlay(structures, warnings) {
+  const ov = document.getElementById('overlay-canvas');
+  const ctx = ov.getContext('2d');
+  ctx.clearRect(0, 0, ov.width, ov.height);
+
+  const hasCritical = warnings.some(w => w.severity === 'critical');
+
+  structures.forEach((s, i) => {
+    if (!s.bbox || s.bbox.length < 4) return;
+
+    const [xp, yp, wp, hp] = s.bbox;
+    const x = (xp / 100) * ov.width;
+    const y = (yp / 100) * ov.height;
+    const w = (wp / 100) * ov.width;
+    const h = (hp / 100) * ov.height;
+    const color = s.color || '#00d4ff';
+    const isCrit = s.type === 'vessel' || (hasCritical && i < 2);
+
+    // Fill
+    ctx.fillStyle = color.replace(')', ',0.15)').replace('rgb', 'rgba').replace('#', '').length > 6
+      ? color + '28' : hexAlpha(color, 0.15);
+    ctx.fillRect(x, y, w, h);
+
+    // Border
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isCrit ? 2.5 : 1.5;
+    if (isCrit) ctx.setLineDash([6, 3]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+
+    // Corner brackets
+    const cs = Math.min(w, h, 16) * 0.4;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    // TL
+    ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y);
+    // TR
+    ctx.moveTo(x + w - cs, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cs);
+    // BR
+    ctx.moveTo(x + w, y + h - cs); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - cs, y + h);
+    // BL
+    ctx.moveTo(x + cs, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - cs);
+    ctx.stroke();
+
+    // Label badge
+    const conf = Math.round((s.confidence || 0) * 100);
+    const labelText = `${s.label.toUpperCase()}  ${conf}%`;
+    ctx.font = `500 10px "IBM Plex Mono", monospace`;
+    const tw = ctx.measureText(labelText).width;
+    const bx = x;
+    const by = y > 20 ? y - 18 : y + h + 2;
+
+    ctx.fillStyle = color;
+    ctx.fillRect(bx, by, tw + 14, 16);
+    ctx.fillStyle = '#040810';
+    ctx.fillText(labelText, bx + 7, by + 11);
+  });
+
+  // Scan line sweep animation (one-time)
+  let sweep = 0;
+  const sweepAnim = () => {
+    if (sweep > ov.height) return;
+    ctx.strokeStyle = 'rgba(0,212,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, sweep);
+    ctx.lineTo(ov.width, sweep);
+    ctx.stroke();
+    sweep += 4;
+    requestAnimationFrame(sweepAnim);
+  };
+  sweepAnim();
+}
+
+function hexAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ════════════════════════════════════════
+//  DETECTION LIST
+// ════════════════════════════════════════
+function renderDetList(structures) {
+  const list = document.getElementById('det-list');
+  list.innerHTML = '';
+  document.getElementById('det-badge').textContent = structures.length;
+
+  if (!structures.length) {
+    list.innerHTML = '<div style="padding:12px;font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);text-align:center;">No structures detected.</div>';
+    return;
+  }
+
+  const sorted = [...structures].sort((a,b) => (b.confidence||0) - (a.confidence||0));
+  sorted.forEach((s, i) => {
+    const conf = Math.round((s.confidence || 0) * 100);
+    const color = s.color || '#00d4ff';
+    const row = document.createElement('div');
+    row.className = 'det-row' + (s.type === 'vessel' ? ' critical-row' : '');
+    row.style.animationDelay = `${i*30}ms`;
+    row.innerHTML = `
+      <div class="det-swatch" style="background:${color}"></div>
+      <div class="det-info">
+        <div class="det-name">${s.label}</div>
+        <div class="det-type">${s.type} · ${s.location || '?'}</div>
+        <div class="det-conf-bar"><div class="det-conf-fill" style="width:${conf}%;background:${color}"></div></div>
+      </div>
+      <div class="det-conf-val" style="color:${color}">${conf}%</div>`;
+    list.appendChild(row);
+  });
+}
+
+// ════════════════════════════════════════
+//  WARNINGS
+// ════════════════════════════════════════
+function renderWarnings(warnings) {
+  const list = document.getElementById('warnings-list');
+  const badge = document.getElementById('warn-badge');
+  list.innerHTML = '';
+
+  if (!warnings.length) {
+    badge.textContent = 'CLEAR';
+    badge.style.cssText = 'background:rgba(0,255,136,0.1);color:var(--green);border-color:var(--green-dim)';
+    list.innerHTML = '<div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);line-height:2;">No active warnings.</div>';
+    return;
+  }
+
+  const hasCrit = warnings.some(w => w.severity === 'critical');
+  if (hasCrit) {
+    badge.textContent = '⚠ CRITICAL';
+    badge.style.cssText = 'background:rgba(255,51,85,0.15);color:var(--red);border-color:var(--red)';
+  } else {
+    badge.textContent = '◈ CAUTION';
+    badge.style.cssText = 'background:rgba(255,170,0,0.1);color:var(--amber);border-color:var(--amber)';
+  }
+
+  warnings.forEach((w, i) => {
+    const icon = w.severity === 'critical' ? '⚠' : w.severity === 'warning' ? '◈' : 'ℹ';
+    const item = document.createElement('div');
+    item.className = 'warning-item' + (w.severity === 'critical' ? ' critical' : '');
+    item.style.animationDelay = `${i*40}ms`;
+    item.innerHTML = `<span class="w-icon">${icon}</span><span>${w.message}</span>`;
+    list.appendChild(item);
+    log(`[${w.severity.toUpperCase()}] ${w.message}`, w.severity === 'critical' ? 'err' : 'warn');
+  });
+}
+
+// ════════════════════════════════════════
+//  CLEAR
+// ════════════════════════════════════════
+function clearScene() {
+  if (videoEl) { videoEl.pause(); videoEl.src = ''; videoEl = null; }
+  currentMode = null;
+  currentFrameData = null;
+  lastAnalysis = null;
+  isPlaying = false;
+  frameCount = 0;
+
+  document.getElementById('drop-zone').style.display = 'flex';
+  document.getElementById('canvas-wrap').style.display = 'none';
+  document.getElementById('scrubber-bar').classList.remove('visible');
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('analyze-frame-btn').disabled = true;
+  document.getElementById('play-btn').textContent = '▶';
+  document.getElementById('hud-tl').innerHTML = '';
+  document.getElementById('hud-tr').innerHTML = '';
+  document.getElementById('hud-bl').innerHTML = '';
+  document.getElementById('frame-counter').textContent = '';
+  document.getElementById('safety-alert').style.display = 'none';
+
+  document.getElementById('s-objects').textContent = '—';
+  document.getElementById('s-risk').textContent = '—';
+  document.getElementById('s-ms').textContent = '—';
+  document.getElementById('s-risk').style.color = 'var(--cyan)';
+  document.getElementById('phase-name').textContent = 'AWAITING ANALYSIS';
+  document.getElementById('phase-desc').textContent = 'Upload an endoscopic image or video frame to begin.';
+  document.getElementById('phase-badge').textContent = 'IDLE';
+  document.getElementById('det-list').innerHTML = '<div style="padding:12px;font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);text-align:center;line-height:2;">No structures detected yet.<br/>Run analysis to populate.</div>';
+  document.getElementById('warnings-list').innerHTML = '<div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--muted);line-height:2;">No active warnings.</div>';
+  document.getElementById('warn-badge').textContent = 'CLEAR';
+  document.getElementById('warn-badge').style.cssText = 'background:rgba(0,255,136,0.1);color:var(--green);border-color:var(--green-dim)';
+  setEngineStatus(apiKey ? 'ready' : 'off');
+  log('Scene cleared.', 'info');
+}
+
+// ════════════════════════════════════════
+//  INIT LOG
+// ════════════════════════════════════════
+log('SurgiVision OS v2.0 initialized.', 'ok');
+log('Intraoperative Intelligence Engine: Claude Sonnet', 'info');
+log('Capabilities: scene perception · phase detection · safety assessment', 'info');
+log('Compatible: CholecSeg8k · Endoscapes2023 · CholecT45 · SurgiSR4K', 'info');
+log('Drop an endoscopic image or video to begin.', 'data');
+
+if (!apiKey) {
+  setEngineStatus('off');
+  log('No API key detected. Enter key in topbar to activate engine.', 'warn');
+} else {
+  setEngineStatus('ready');
+  log('API key restored from session. Engine ready.', 'ok');
+}
+</script>
+</body>
+</html>

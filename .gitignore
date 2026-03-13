@@ -1,0 +1,6 @@
+# Ignore everything
+*
+# Except the app files
+!index.html
+!README.md
+!.gitignore
