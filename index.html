@@ -934,10 +934,10 @@ body::after {
     <div class="tb-right">
       <div class="tb-status">
         <div class="dot" id="engine-dot"></div>
-        <span id="engine-label">GEMINI VISION</span>
+        <span id="engine-label">GROQ VISION</span>
       </div>
       <div id="api-key-wrap">
-        <input id="api-key-input" type="password" placeholder="AIza... (Google AI Studio key)"/>
+        <input id="api-key-input" type="password" placeholder="gsk_... (Groq API key)"/>
         <button class="tb-save-btn" onclick="saveKey()">SAVE</button>
       </div>
     </div>
@@ -1064,19 +1064,19 @@ body::after {
   <div id="bottombar">
     <div id="ticker">
       <div id="ticker-inner">
-        <span class="tick-item">MODEL<span>gemini-2.0-flash</span></span>
-        <span class="tick-item">RUNTIME<span>BROWSER-NATIVE</span></span>
+        <span class="tick-item">MODEL<span>llama-3.2-11b-vision</span></span>
+        <span class="tick-item">ENGINE<span>GROQ (FREE)</span></span>
         <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
         <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
         <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
-        <span class="tick-item">VERSION<span>2.1.0</span></span>
+        <span class="tick-item">VERSION<span>2.2.0</span></span>
         <!-- duplicate for seamless loop -->
-        <span class="tick-item">MODEL<span>gemini-2.0-flash</span></span>
-        <span class="tick-item">RUNTIME<span>BROWSER-NATIVE</span></span>
+        <span class="tick-item">MODEL<span>llama-3.2-11b-vision</span></span>
+        <span class="tick-item">ENGINE<span>GROQ (FREE)</span></span>
         <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
         <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
         <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
-        <span class="tick-item">VERSION<span>2.1.0</span></span>
+        <span class="tick-item">VERSION<span>2.2.0</span></span>
       </div>
     </div>
     <div id="clock">--:--:--</div>
@@ -1091,9 +1091,9 @@ body::after {
   <div id="modal">
     <div class="modal-title">API KEY REQUIRED</div>
     <div class="modal-body">
-      SurgiVision uses <strong style="color:var(--white)">Google Gemini 2.0 Flash Vision</strong> for surgical scene perception — completely free.<br/><br/>
-      Get a free API key (no credit card) at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com ↗</a><br/><br/>
-      Your key is stored only in your browser's sessionStorage and never sent anywhere except directly to Google.
+      SurgiVision uses <strong style="color:var(--white)">Groq · LLaMA 3.2 Vision</strong> for surgical scene perception — completely free, no credit card needed.<br/><br/>
+      Get a free API key at <a href="https://console.groq.com" target="_blank">console.groq.com ↗</a><br/><br/>
+      Your key is stored only in your browser's sessionStorage and never sent anywhere except directly to Groq.
     </div>
     <input class="modal-input" id="modal-key-input" type="password" placeholder="sk-ant-api03-..."/>
     <div class="modal-row">
@@ -1421,7 +1421,7 @@ async function analyzeCurrentFrame() {
   const step = document.getElementById('proc-step');
   proc.classList.add('active');
   setEngineStatus('running');
-  step.textContent = 'Sending frame to Gemini Vision API...';
+  step.textContent = 'Sending frame to Groq LLaMA Vision...';
 
   const t0 = performance.now();
   log('Initiating scene perception analysis...', 'data');
@@ -1429,25 +1429,33 @@ async function analyzeCurrentFrame() {
   try {
     let res;
     try {
-      res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: SYSTEM_PROMPT + '\n\nAnalyze this surgical frame. Return JSON only.' },
-                { inline_data: { mime_type: 'image/jpeg', data: currentFrameData } }
-              ]
-            }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 1500
-            }
-          })
-        }
-      );
+      res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.2-11b-vision-preview',
+          max_tokens: 1500,
+          temperature: 0.2,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: SYSTEM_PROMPT + '\n\nAnalyze this surgical frame. Return JSON only.'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${currentFrameData}`
+                }
+              }
+            ]
+          }]
+        })
+      });
     } catch (networkErr) {
       throw new Error('Network error — make sure you are on http://localhost:8080 not file://');
     }
@@ -1459,14 +1467,14 @@ async function analyzeCurrentFrame() {
       try {
         const err = await res.json();
         errMsg = err.error?.message || errMsg;
-        if (res.status === 400) errMsg = 'Bad request — ' + errMsg;
-        if (res.status === 403) errMsg = 'Invalid API key. Get a free key at aistudio.google.com';
+        if (res.status === 401) errMsg = 'Invalid API key — check your key at console.groq.com';
+        if (res.status === 429) errMsg = 'Rate limit hit — wait a few seconds and retry';
       } catch(_) {}
       throw new Error(errMsg);
     }
 
     const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const raw = data.choices?.[0]?.message?.content || '';
 
     step.textContent = 'Parsing perception output...';
 
@@ -1734,8 +1742,8 @@ function clearScene() {
 // ════════════════════════════════════════
 //  INIT LOG
 // ════════════════════════════════════════
-log('SurgiVision OS v2.1 initialized.', 'ok');
-log('Intraoperative Intelligence Engine: Gemini 2.0 Flash (free)', 'info');
+log('SurgiVision OS v2.2 initialized.', 'ok');
+log('Intraoperative Intelligence Engine: Groq · LLaMA 3.2 Vision (free)', 'info');
 log('Capabilities: scene perception · phase detection · safety assessment', 'info');
 log('Compatible: CholecSeg8k · Endoscapes2023 · CholecT45 · SurgiSR4K', 'info');
 log('Drop an endoscopic image or video to begin.', 'data');
