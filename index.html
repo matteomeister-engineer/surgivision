@@ -934,10 +934,10 @@ body::after {
     <div class="tb-right">
       <div class="tb-status">
         <div class="dot" id="engine-dot"></div>
-        <span id="engine-label">CLAUDE VISION</span>
+        <span id="engine-label">GEMINI VISION</span>
       </div>
       <div id="api-key-wrap">
-        <input id="api-key-input" type="password" placeholder="sk-ant-api... (Anthropic API key)"/>
+        <input id="api-key-input" type="password" placeholder="AIza... (Google AI Studio key)"/>
         <button class="tb-save-btn" onclick="saveKey()">SAVE</button>
       </div>
     </div>
@@ -1064,19 +1064,19 @@ body::after {
   <div id="bottombar">
     <div id="ticker">
       <div id="ticker-inner">
-        <span class="tick-item">MODEL<span>claude-sonnet-4-20250514</span></span>
+        <span class="tick-item">MODEL<span>gemini-2.0-flash</span></span>
         <span class="tick-item">RUNTIME<span>BROWSER-NATIVE</span></span>
         <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
         <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
         <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
-        <span class="tick-item">VERSION<span>2.0.0</span></span>
+        <span class="tick-item">VERSION<span>2.1.0</span></span>
         <!-- duplicate for seamless loop -->
-        <span class="tick-item">MODEL<span>claude-sonnet-4-20250514</span></span>
+        <span class="tick-item">MODEL<span>gemini-2.0-flash</span></span>
         <span class="tick-item">RUNTIME<span>BROWSER-NATIVE</span></span>
         <span class="tick-item">TASK<span>SURGICAL SCENE PERCEPTION</span></span>
         <span class="tick-item">DATASET<span>CHOLEC80 / ENDOSCAPES / SURGISR4K</span></span>
         <span class="tick-item">GROUP<span>INTRAOPERATIVE INTELLIGENCE</span></span>
-        <span class="tick-item">VERSION<span>2.0.0</span></span>
+        <span class="tick-item">VERSION<span>2.1.0</span></span>
       </div>
     </div>
     <div id="clock">--:--:--</div>
@@ -1091,9 +1091,9 @@ body::after {
   <div id="modal">
     <div class="modal-title">API KEY REQUIRED</div>
     <div class="modal-body">
-      SurgiVision uses the <strong style="color:var(--white)">Anthropic Claude Vision API</strong> for surgical scene perception.<br/><br/>
-      Enter your API key to enable AI analysis. Your key is stored only in your browser's sessionStorage and never sent anywhere except directly to Anthropic.<br/><br/>
-      Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com ↗</a>
+      SurgiVision uses <strong style="color:var(--white)">Google Gemini 2.0 Flash Vision</strong> for surgical scene perception — completely free.<br/><br/>
+      Get a free API key (no credit card) at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com ↗</a><br/><br/>
+      Your key is stored only in your browser's sessionStorage and never sent anywhere except directly to Google.
     </div>
     <input class="modal-input" id="modal-key-input" type="password" placeholder="sk-ant-api03-..."/>
     <div class="modal-row">
@@ -1155,10 +1155,10 @@ function setEngineStatus(state) {
   const dot = document.getElementById('engine-dot');
   const lbl = document.getElementById('engine-label');
   dot.className = 'dot';
-  if (state === 'ready') { dot.classList.add(''); lbl.textContent = 'ENGINE READY'; }
+  if (state === 'ready')        { lbl.textContent = 'ENGINE READY'; }
   else if (state === 'running') { dot.classList.add('amber'); lbl.textContent = 'ANALYZING...'; }
-  else if (state === 'error') { dot.classList.add('red'); lbl.textContent = 'ENGINE ERROR'; }
-  else { dot.classList.add('off'); lbl.textContent = 'NO API KEY'; }
+  else if (state === 'error')   { dot.classList.add('red');   lbl.textContent = 'ENGINE ERROR'; }
+  else                          { dot.classList.add('off');   lbl.textContent = 'NO API KEY'; }
 }
 
 // ════════════════════════════════════════
@@ -1181,8 +1181,10 @@ function saveKeyFromModal() {
   document.getElementById('api-key-input').value = val;
   setEngineStatus('ready');
   closeModal();
-  log('API key activated. Proceeding with analysis.', 'ok');
-  analyzeCurrentFrame();
+  log('API key activated. Engine ready.', 'ok');
+  // Only auto-analyze if we already have a frame loaded
+  if (currentFrameData) analyzeCurrentFrame();
+  else log('Now drop an image or video to begin analysis.', 'data');
 }
 
 function closeModal() { document.getElementById('modal-bg').classList.remove('active'); }
@@ -1408,7 +1410,7 @@ If the image is not a surgical/medical image, still attempt analysis of what you
 Return ONLY the JSON object.`;
 
 async function analyzeCurrentFrame() {
-  if (!currentFrameData) { log('No frame data available.', 'warn'); return; }
+  if (!currentFrameData) { log('No frame data — load an image or video first.', 'warn'); return; }
 
   if (!apiKey) {
     document.getElementById('modal-bg').classList.add('active');
@@ -1419,66 +1421,70 @@ async function analyzeCurrentFrame() {
   const step = document.getElementById('proc-step');
   proc.classList.add('active');
   setEngineStatus('running');
-  step.textContent = 'Sending frame to Claude Vision API...';
+  step.textContent = 'Sending frame to Gemini Vision API...';
 
   const t0 = performance.now();
   log('Initiating scene perception analysis...', 'data');
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: SYSTEM_PROMPT,
-        messages: [{
-          role: 'user',
-          content: [{
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/jpeg', data: currentFrameData }
-          }, {
-            type: 'text',
-            text: 'Analyze this surgical frame. Return JSON only.'
-          }]
-        }]
-      })
-    });
+    let res;
+    try {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: SYSTEM_PROMPT + '\n\nAnalyze this surgical frame. Return JSON only.' },
+                { inline_data: { mime_type: 'image/jpeg', data: currentFrameData } }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 1500
+            }
+          })
+        }
+      );
+    } catch (networkErr) {
+      throw new Error('Network error — make sure you are on http://localhost:8080 not file://');
+    }
 
     const elapsed = Math.round(performance.now() - t0);
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
+      let errMsg = `HTTP ${res.status}`;
+      try {
+        const err = await res.json();
+        errMsg = err.error?.message || errMsg;
+        if (res.status === 400) errMsg = 'Bad request — ' + errMsg;
+        if (res.status === 403) errMsg = 'Invalid API key. Get a free key at aistudio.google.com';
+      } catch(_) {}
+      throw new Error(errMsg);
     }
 
     const data = await res.json();
-    const raw = data.content?.[0]?.text || '';
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     step.textContent = 'Parsing perception output...';
 
-    // Parse JSON — strip any accidental markdown
     let analysis;
     try {
       const cleaned = raw.replace(/```json|```/g, '').trim();
       analysis = JSON.parse(cleaned);
     } catch (pe) {
-      throw new Error(`JSON parse failed: ${pe.message}\nRaw: ${raw.slice(0,200)}`);
+      throw new Error(`JSON parse failed. Raw: ${raw.slice(0, 300)}`);
     }
 
     lastAnalysis = analysis;
     log(`Analysis complete in ${elapsed}ms — ${(analysis.structures||[]).length} structures detected.`, 'ok');
-
     renderAnalysis(analysis, elapsed);
     setEngineStatus('ready');
 
   } catch(e) {
-    log(`Error: ${e.message}`, 'err');
+    log(`❌ ${e.message}`, 'err');
     setEngineStatus('error');
     document.getElementById('phase-name').textContent = 'ANALYSIS FAILED';
     document.getElementById('phase-desc').textContent = e.message;
@@ -1728,8 +1734,8 @@ function clearScene() {
 // ════════════════════════════════════════
 //  INIT LOG
 // ════════════════════════════════════════
-log('SurgiVision OS v2.0 initialized.', 'ok');
-log('Intraoperative Intelligence Engine: Claude Sonnet', 'info');
+log('SurgiVision OS v2.1 initialized.', 'ok');
+log('Intraoperative Intelligence Engine: Gemini 2.0 Flash (free)', 'info');
 log('Capabilities: scene perception · phase detection · safety assessment', 'info');
 log('Compatible: CholecSeg8k · Endoscapes2023 · CholecT45 · SurgiSR4K', 'info');
 log('Drop an endoscopic image or video to begin.', 'data');
