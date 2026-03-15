@@ -1,148 +1,153 @@
-# 🔬 SurgiVision OS v2.0 — Intraoperative Intelligence Platform
+# SurgiVision OS
 
-A browser-native surgical AI perception platform built to simulate what **Intuitive Surgical's Intraoperative Intelligence Group** is building for the da Vinci robot. Runs entirely in your browser — no server, no build step.
+**Intraoperative AI Perception System — Browser-native surgical scene understanding**
 
-> **Drop a real endoscopic frame → Claude Vision API → live surgical scene understanding**
-
-![Version](https://img.shields.io/badge/version-2.0.0-00d4ff?style=flat-square)
-![Model](https://img.shields.io/badge/model-claude--sonnet--4-00ff88?style=flat-square)
-![Input](https://img.shields.io/badge/input-image%20%2B%20video-a78bfa?style=flat-square)
-![Runtime](https://img.shields.io/badge/runtime-browser%20native-ffaa00?style=flat-square)
+> Built as a portfolio demonstration for the ML Engineer — Intraoperative Intelligence position at Intuitive Surgical (Aubonne, CH).
 
 ---
 
-## ✨ What's New in v2 (vs v1)
+## Overview
 
-| Feature | v1 | v2 |
-|---|---|---|
-| AI Engine | DETR (COCO, generic) | **Claude Sonnet Vision API** (surgical-aware) |
-| Input | Images only | **Images + Video** with scrubber |
-| Output | Bounding boxes | **Segmentation + phase + safety warnings** |
-| Scene context | None | **Surgical phase detection** (Dissection, Clipping, etc.) |
-| Safety | None | **Critical structure proximity warnings** |
-| HUD | Basic | **Full intraoperative HUD** with live overlays |
-| Data | Synthetic demo only | **Real dataset links** (CholecSeg8k, Endoscapes, etc.) |
+SurgiVision OS is a real-time surgical scene perception application that runs entirely in the browser. It demonstrates the kind of intraoperative intelligence pipeline that powers next-generation robotic surgery systems — combining a large vision-language model for semantic understanding with a domain-specific segmentation backbone trained on endoscopic imagery.
 
----
-
-## 🎯 Capabilities
-
-### 1. Surgical Scene Perception
-Claude Vision analyzes each frame and identifies:
-- **Anatomical structures** — liver, gallbladder, cystic duct, hepatocystic triangle
-- **Surgical instruments** — grasper, clipper, hook, scissors, irrigator
-- **Tissue types** — fat, connective tissue, blood vessels, bile
-- **Fluids** — blood, bile, irrigation fluid
-
-### 2. Surgical Phase Detection
-Identifies the current phase of surgery in real time:
-- Trocar Placement → Preparation → Calot Triangle Dissection
-- Clipping & Cutting → Gallbladder Dissection → Extraction → Closure
-
-### 3. Safety Assessment
-Flags critical situations:
-- ⚠ Instrument proximity to major vessel
-- ⚠ Unclear anatomy / poor visibility
-- ⚠ Active bleeding detected
-- ⚠ Critical View of Safety (CVS) not achieved
-
-### 4. Video Frame Analysis
-- Load any surgical video (MP4, MOV, WEBM)
-- Scrub to any frame with the timeline
-- Analyze individual frames on demand
-- Temporal navigation through procedure
+The system processes laparoscopic and endoscopic video frames and produces:
+- Pixel-level anatomical segmentation masks
+- Surgical phase recognition
+- Action triplet detection (`instrument → verb → target`)
+- Safety warnings and critical event detection
+- Real-time inference metrics
 
 ---
 
-## 🚀 Getting Started
+## Architecture
 
-### 1. Get an API Key
-Go to [console.anthropic.com](https://console.anthropic.com) and create an API key.
-
-### 2. Open the App
-```bash
-# Option A: direct open
-open index.html
-
-# Option B: local server (recommended for video)
-python3 -m http.server 8080
-# visit http://localhost:8080
+```
+Endoscopic Frame
+       │
+       ├──► Groq · Llama 4 Scout Vision ──► Surgical Phase
+       │         (LLM scene understanding)    Action Triplets
+       │                                      Safety Warnings
+       │
+       └──► EndoViT + DPT ──────────────► Pixel-level Segmentation Masks
+                (domain-pretrained ViT)       13-class anatomical labels
 ```
 
-### 3. Enter Your API Key
-Paste your `sk-ant-api...` key in the topbar input and click **SAVE**.
+### Dual-Pipeline Design
 
-### 4. Load Surgical Footage
-Drop an image or video, or use one of the linked free datasets.
+**Pipeline 1 — LLM Scene Understanding (Groq · Llama 4 Scout)**
+- Identifies surgical phase (Dissection, Clipping, Hemostasis, etc.)
+- Detects action triplets: `<instrument, verb, target>`
+- Generates safety warnings for critical structures
+- ~1.5s inference via Groq free API
+
+**Pipeline 2 — Surgical Segmentation (EndoViT + DPT)**
+- EndoViT: Vision Transformer pre-trained on Endo700k (743,724 endoscopic images)
+- Fine-tuned on CholecSeg8k (8,080 annotated laparoscopic frames, 13 classes)
+- DPT decoder head for pixel-precise segmentation
+- MPS-accelerated inference on Apple Silicon
+- ~2-4s per frame
+
+Both pipelines run in parallel — the LLM provides semantic context, EndoViT provides spatial precision.
 
 ---
 
-## 📁 Free Surgical Datasets
+## Segmentation Classes (CholecSeg8k · 13 classes)
 
-| Dataset | Type | Structures | Access |
-|---|---|---|---|
-| **[CholecSeg8k](https://www.kaggle.com/datasets/newslab/cholecseg8k)** | Images (annotated) | 13 surgical classes | Free on Kaggle |
-| **[Endoscapes2023](https://github.com/CAMMA-public/Endoscapes)** | Video frames | Anatomy + CVS | Free on GitHub |
-| **[CholecT45](https://github.com/CAMMA-public/cholect50)** | Videos | Instrument+verb+target | Free on GitHub |
-| **[SurgiSR4K](https://arxiv.org/abs/2507.00209)** | 4K da Vinci video | Full surgical scene | Free on HuggingFace |
-| **[Cholec80](https://camma.unistra.fr/datasets/)** | 80 full videos | Phase + tool | Request form |
+| Class | Color | Description |
+|---|---|---|
+| Liver | `#c43020` | Hepatic parenchyma |
+| Gallbladder | `#40a040` | Cholecystic structure |
+| Grasper | `#c0c8d0` | Laparoscopic grasper |
+| L-Hook Electrocautery | `#e0e0ff` | Cautery instrument |
+| Fat | `#d0b040` | Adipose tissue |
+| Cystic Duct | `#e03050` | Critical bile duct |
+| Hepatic Vein | `#8040c0` | Vascular structure |
+| Blood | `#ff2040` | Active bleeding |
+| Abdominal Wall | `#c08060` | Peritoneal wall |
+| Connective Tissue | `#b08080` | Fascial tissue |
+| Gastrointestinal | `#a06040` | GI tract |
+| Liver Ligament | `#804020` | Hepatic ligaments |
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Component | Technology |
 |---|---|
-| AI Vision | Anthropic Claude Sonnet (claude-sonnet-4-20250514) |
-| Rendering | HTML5 Canvas API (2D overlay) |
-| Video | HTML5 Video Element + frame capture |
-| Fonts | Orbitron + IBM Plex Mono (Google Fonts) |
-| Framework | Vanilla JS — zero dependencies |
-| Hosting | Any static host (GitHub Pages, Netlify, etc.) |
+| Frontend | Vanilla JS · HTML5 Canvas API · CSS Grid Bento layout |
+| LLM Inference | Groq API · Llama 4 Scout 17B Vision |
+| Segmentation Backbone | EndoViT (MAE ViT-Base, Endo700k pretrained) |
+| Segmentation Head | DPT (Dense Prediction Transformer) |
+| Training | PyTorch 2.0 · CUDA/MPS · AdamW · CosineAnnealingLR |
+| Loss | CrossEntropy + Dice |
+| Backend | Python · Flask · CORS |
+| Acceleration | Apple MPS (inference) · Kaggle P100 (training) |
 
 ---
 
-## 📐 Architecture
+## Setup
 
-```
-User drops image/video
-        ↓
-Frame extracted to Canvas
-        ↓
-Canvas → base64 JPEG
-        ↓
-POST /v1/messages (Claude Vision API)
-  - System: surgical perception prompt
-  - Image: base64 frame
-        ↓
-JSON response parsed:
-  { phase, structures[], warnings[], summary }
-        ↓
-Canvas overlay rendered (bounding boxes + labels)
-Right panel updated (detections, phase, warnings)
-HUD overlays updated
-Safety alert triggered if critical
+### 1. Segmentation server (EndoViT)
+
+```bash
+cd /path/to/EndoViT
+conda activate endovit
+python surgivision_server.py
+# Runs on http://localhost:5050
 ```
 
----
+### 2. Web app
 
-## 🔮 Roadmap
+```bash
+cd /path/to/SurgiVision
+python3 -m http.server 8080
+# Open http://localhost:8080
+```
 
-- [ ] Auto-analyze every N seconds during video playback
-- [ ] Export analysis as COCO JSON annotation format
-- [ ] Side-by-side frame comparison (before/after)
-- [ ] Temporal tracking across frames
-- [ ] Custom fine-tuned surgical model via Replicate/HuggingFace
-- [ ] Multi-frame procedure summary report
+### 3. API key
 
----
-
-## ⚠️ Disclaimer
-
-For demonstration and research purposes only. **Not a medical device.** Do not use for clinical decision-making.
+Enter your [Groq API key](https://console.groq.com) (`gsk_...`) in the topbar. Free tier, no credit card required.
 
 ---
 
-## 📄 License
+## Training
 
-MIT
+Fine-tuning EndoViT on CholecSeg8k (few-shot · 4 videos · Kaggle P100):
+
+```bash
+python datasets/CholecSeg8k/utils/preprocess_CholecSeg8k_multi_process.py \
+    --data_dir /path/to/archive \
+    --output_dir ./datasets/CholecSeg8k/data_preprocessed \
+    --cpu_count 4
+# Then run EndoViT_SurgiVision_Training.ipynb on Kaggle
+```
+
+Config: backbone LR `1e-5` · head LR `1e-4` · 50 epochs · batch 12 · ~65% mIoU (4-video few-shot)
+
+---
+
+## Relevance to Intuitive Surgical
+
+This project directly addresses the **ML Engineer — Intraoperative Intelligence** role:
+
+- **Real-time surgical perception**: dual-pipeline inference optimised for low latency on-device
+- **Domain-specific model development**: EndoViT fine-tuned on cholecystectomy data, not generic ImageNet features
+- **Safety-critical design**: explicit detection of cystic duct and hepatic vein with alert escalation
+- **On-device inference**: MPS-optimised for Apple Silicon, adaptable to embedded surgical robotics constraints
+- **Synthetic data readiness**: architecture designed to integrate with generative endoscopic data pipelines
+
+---
+
+## References
+
+- [EndoViT](https://link.springer.com/article/10.1007/s11548-024-03091-5) — Batić et al., 2024
+- [CholecSeg8k](https://arxiv.org/abs/2012.12453) — Hong et al., 2020
+- [DPT](https://arxiv.org/abs/2103.13413) — Ranftl et al., 2021
+- [MAE](https://arxiv.org/abs/2111.06377) — He et al., 2021
+
+---
+
+## License
+
+MIT — research and portfolio demonstration.
+Dataset usage subject to CholecSeg8k (CC BY-NC-SA 4.0) and respective Endo700k dataset licenses.
