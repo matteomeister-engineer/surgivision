@@ -1,6 +1,15 @@
-# Ignore everything
-*
-# Except the app files
-!index.html
-!README.md
-!.gitignore
+# App files (keep in git)
+# index.html
+# README.md
+# Logo.png
+# surgivision_server.py
+
+# Never commit these
+.env
+*.rtf
+.DS_Store
+archive/
+datasets/
+*.pth
+__pycache__/
+*.pyc
