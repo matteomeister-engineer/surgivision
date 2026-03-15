@@ -13,3 +13,4 @@ datasets/
 *.pth
 __pycache__/
 *.pyc
+Inspo/
