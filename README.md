@@ -2,8 +2,6 @@
 
 **Intraoperative AI Perception System — Browser-native surgical scene understanding**
 
-> Built as a portfolio demonstration for the ML Engineer — Intraoperative Intelligence position at Intuitive Surgical (Aubonne, CH).
-
 ---
 
 ## Overview
@@ -126,9 +124,7 @@ Config: backbone LR `1e-5` · head LR `1e-4` · 50 epochs · batch 12 · ~65% mI
 
 ---
 
-## Relevance to Intuitive Surgical
-
-This project directly addresses the **ML Engineer — Intraoperative Intelligence** role:
+## Highlights
 
 - **Real-time surgical perception**: dual-pipeline inference optimised for low latency on-device
 - **Domain-specific model development**: EndoViT fine-tuned on cholecystectomy data, not generic ImageNet features
