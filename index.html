@@ -812,25 +812,6 @@ BBOX: normalized 0.0-1.0, tight fit, [x,y,w,h] top-left origin. Max 6 structures
 Colors: liver=#c43020 gallbladder=#40a040 vessel=#e03050 fat=#d0b040 instrument=#c0c8d0 bleeding=#ff2040
 Return ONLY JSON.`;
 
-const ENDOVIT_URL = 'http://localhost:5050';
-let endovitAvailable = false;
-
-// Check if EndoViT server is running
-async function checkEndoViT() {
-  try {
-    const r = await fetch(`${ENDOVIT_URL}/health`, { signal: AbortSignal.timeout(2000) });
-    if (r.ok) {
-      endovitAvailable = true;
-      log('EndoViT segmentation server connected ✓', 'ok');
-      document.getElementById('elbl').textContent = 'GROQ + ENDOVIT';
-    }
-  } catch(_) {
-    endovitAvailable = false;
-    log('EndoViT server not found — using Groq only. Start surgivision_server.py to enable real segmentation.', 'warn');
-  }
-}
-checkEndoViT();
-
 async function analyzeCurrentFrame() {
   if (!currentFrameData) { log('No frame loaded.','warn'); return; }
   if (!apiKey) { document.getElementById('modal-bg').classList.add('on'); return; }
@@ -838,10 +819,9 @@ async function analyzeCurrentFrame() {
   const proc=document.getElementById('processing'), step=document.getElementById('proc-step');
   proc.classList.add('on'); setStatus('running');
   const t0=performance.now();
-  log('Starting dual-pipeline analysis...','data');
+  log('Analyzing...','data');
 
   try {
-    // ── Pipeline 1: Groq/Llama — phase, warnings, surgical context ──
     step.textContent = 'Groq: Scene understanding...';
     let groqResult = null;
     try {
@@ -863,11 +843,9 @@ async function analyzeCurrentFrame() {
         let clean  = raw.replace(/```json|```/g,'').trim();
         const s = clean.indexOf('{'), e = clean.lastIndexOf('}');
         if (s !== -1 && e !== -1) clean = clean.slice(s, e+1);
-        // Repair truncated JSON — close any open arrays/objects
         try {
           groqResult = JSON.parse(clean);
         } catch {
-          // Try to salvage partial JSON by closing open structures
           let depth = 0, inStr = false, repaired = '';
           for (let i = 0; i < clean.length; i++) {
             const ch = clean[i];
@@ -875,11 +853,8 @@ async function analyzeCurrentFrame() {
             if (!inStr) { if (ch==='{') depth++; else if (ch==='}') depth--; }
             repaired += ch;
           }
-          // Close unclosed string if needed
           if (inStr) repaired += '"';
-          // Remove trailing comma before closing
           repaired = repaired.replace(/,\s*$/, '');
-          // Close open arrays/objects
           while (depth > 0) { repaired += '}'; depth--; }
           try { groqResult = JSON.parse(repaired); } catch { /* give up */ }
         }
@@ -889,64 +864,19 @@ async function analyzeCurrentFrame() {
       log(`Groq error: ${ge.message}`, 'warn');
     }
 
-    // ── Pipeline 2: EndoViT — pixel-precise segmentation ──
-    let endovitStructures = null;
-    if (endovitAvailable) {
-      step.textContent = 'EndoViT: Segmentation...';
-      try {
-        const segRes = await fetch(`${ENDOVIT_URL}/segment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: currentFrameData }),
-          signal: AbortSignal.timeout(15000)
-        });
-        if (segRes.ok) {
-          const segData = await segRes.json();
-          endovitStructures = segData.structures || [];
-          log(`EndoViT: ${endovitStructures.length} structures segmented on ${segData.device}`, 'ok');
-        }
-      } catch(se) {
-        log(`EndoViT error: ${se.message} — falling back to flood fill`, 'warn');
-        endovitAvailable = false;
-        document.getElementById('elbl').textContent = 'GROQ · LLAMA 4';
-      }
-    }
-
     const elapsed = Math.round(performance.now() - t0);
-
-    // ── Merge results ──
-    // Always use Groq structures for labels/confidence/display
-    // EndoViT adds pixel-level mask_points on top of Groq structures when available
-    const groqStructures = groqResult?.structures || [];
-
-    // Enrich Groq structures with EndoViT mask_points where labels match
-    let finalStructures = groqStructures;
-    if (endovitStructures && endovitStructures.length > 0) {
-      finalStructures = groqStructures.map(gs => {
-        const match = endovitStructures.find(es =>
-          es.label?.toLowerCase() === gs.label?.toLowerCase()
-        );
-        return match ? { ...gs, mask_points: match.mask_points } : gs;
-      });
-      // Add any EndoViT structures not in Groq result (low confidence, skip if <10%)
-      const extra = endovitStructures.filter(es =>
-        !groqStructures.find(gs => gs.label?.toLowerCase() === es.label?.toLowerCase())
-        && (es.confidence || 0) > 0.1
-      );
-      finalStructures = [...finalStructures, ...extra];
-    }
 
     const finalAnalysis = {
       phase:      groqResult?.phase      || { name: 'Unknown', description: '' },
       warnings:   groqResult?.warnings   || [],
       summary:    groqResult?.summary    || '',
       triplets:   groqResult?.triplets   || [],
-      structures: finalStructures,
-      _source:    endovitStructures ? 'groq+endovit' : 'groq',
+      structures: groqResult?.structures || [],
+      _source:    'groq',
     };
 
     lastAnalysis = finalAnalysis;
-    log(`Done in ${elapsed}ms — ${finalStructures.length} structures [${finalAnalysis._source}]`, 'ok');
+    log(`Done in ${elapsed}ms — ${finalAnalysis.structures.length} structures`, 'ok');
     renderResult(finalAnalysis, elapsed);
     setStatus('ready');
 
