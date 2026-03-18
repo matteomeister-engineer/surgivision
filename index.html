@@ -346,13 +346,6 @@ html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); col
   <button class="tb-btn primary" id="analyze-btn" onclick="analyzeCurrentFrame()" disabled>◈ ANALYZE</button>
   <button class="tb-btn" onclick="clearScene()">✕ CLEAR</button>
   <button id="save-btn" onclick="saveFrame()">↓ SAVE</button>
-  <div class="tsep"></div>
-  <div id="auto-group">
-    <div class="toggle-switch" id="auto-toggle" onclick="toggleAutoAnalysis()"></div>
-    <span class="auto-lbl" id="auto-label">AUTO</span>
-    <input class="interval-input" id="interval-input" type="number" value="3" min="1" max="30"/>
-    <span class="auto-lbl">s</span>
-  </div>
   <div class="tb-right">
     <div class="epill"><div class="edot" id="edot"></div><span id="elbl">GROQ · LLAMA 4</span></div>
     <input id="api-key-input" type="password" placeholder="gsk_... Groq API key"/>
@@ -381,7 +374,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); col
       <div class="dz-title">Drop surgical frame here</div>
       <div class="dz-sub">
         Endoscopic · Laparoscopic · Robotic assisted<br/>
-        PNG · JPG · MP4 · MOV
+        JPG · PNG · HEIC · WEBP · MP4 · MOV · AVI · MKV
       </div>
       <div class="dz-or">or</div>
       <div class="dz-cta">Browse files</div>
@@ -545,7 +538,10 @@ function closeModal() { document.getElementById('modal-bg').classList.remove('on
 
 function triggerUpload(t) {
   const i = document.getElementById('file-input');
-  i.accept = t==='video' ? 'video/*' : 'image/*,video/*'; i.click();
+  i.accept = t === 'video'
+    ? 'video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v,.mpg,.mpeg,.wmv,.3gp,.flv'
+    : 'image/*,video/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.tif,.heic,.heif,.avif,.mp4,.mov,.avi,.mkv,.webm,.m4v,.mpg,.mpeg,.wmv,.3gp,.flv';
+  i.click();
 }
 
 document.getElementById('file-input').addEventListener('change', e => {
@@ -556,9 +552,15 @@ function onDrop(e) { e.preventDefault(); document.getElementById('drop-zone').cl
 function onDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag'); }
 function onDragLeave() { document.getElementById('drop-zone').classList.remove('drag'); }
 
+function isVideoFile(f) {
+  if (f.type.startsWith('video/')) return true;
+  const ext = f.name.split('.').pop().toLowerCase();
+  return ['mp4','mov','avi','mkv','webm','m4v','mpg','mpeg','wmv','3gp','flv'].includes(ext);
+}
+
 function handleFile(f) {
   log(`Loading: ${f.name}`, 'info');
-  f.type.startsWith('video/') ? loadVideo(f) : loadImage(f);
+  isVideoFile(f) ? loadVideo(f) : loadImage(f);
 }
 
 function loadImage(file) {
@@ -567,6 +569,7 @@ function loadImage(file) {
     const img = new Image();
     img.onload = () => {
       if (videoEl) { videoEl.pause(); videoEl=null; }
+      stopAutoAnalysis(); // images don't use auto analysis
       showCanvas(); renderImg(img);
       document.getElementById('scrubber').classList.remove('on');
       document.getElementById('analyze-btn').disabled = false;
@@ -593,6 +596,7 @@ function renderImg(img) {
 }
 
 function loadVideo(file) {
+  stopAutoAnalysis(); // stop any previous analysis loop
   if (videoEl) { videoEl.pause(); videoEl.src=''; }
   videoEl = document.createElement('video');
   videoEl.src = URL.createObjectURL(file);
@@ -606,7 +610,15 @@ function loadVideo(file) {
     setBadge('feed-badge','VIDEO','bg');
     log(`Video: ${videoEl.videoWidth}×${videoEl.videoHeight} · ${fmt(videoEl.duration)}`,'ok');
   });
-  videoEl.addEventListener('loadeddata', () => { setupVCanvas(); renderVFrame(); updateHUD(videoEl.videoWidth, videoEl.videoHeight); }, {once:true});
+  videoEl.addEventListener('loadeddata', () => {
+    setupVCanvas(); renderVFrame();
+    updateHUD(videoEl.videoWidth, videoEl.videoHeight);
+    // Auto-play and start continuous analysis
+    videoEl.play();
+    isPlaying = true;
+    document.getElementById('play-btn').textContent = '⏸';
+    startAutoAnalysis();
+  }, {once:true});
   videoEl.addEventListener('timeupdate', () => {
     document.getElementById('timeline').value = videoEl.currentTime;
     document.getElementById('time-display').textContent = `${fmt(videoEl.currentTime)} / ${fmt(videoEl.duration)}`;
@@ -737,64 +749,67 @@ function renderTriplets(structures, phase) {
 
 // ── AUTO ANALYSIS ──
 let autoTimer = null, framesAnalyzed = 0;
+let _autoRunning = false, _autoAnalyzing = false;
+let _overlayOpacity = 1, _fadingOut = false, _fadeRAF = null;
 
-function toggleAutoAnalysis() {
-  const toggle = document.getElementById('auto-toggle');
-  const label  = document.getElementById('auto-label');
-  const isOn   = toggle.classList.contains('on');
-  if (isOn) {
-    toggle.classList.remove('on');
-    label.textContent = 'AUTO'; label.className = 'auto-lbl';
-    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-    log('Auto analysis stopped.', 'info');
-  } else {
-    if (!currentFrameData) { log('Load an image or video first.', 'warn'); return; }
-    const secs = parseInt(document.getElementById('interval-input').value) || 3;
-    toggle.classList.add('on');
-    label.textContent = `AUTO ${secs}s`; label.className = 'auto-lbl on';
-    log(`Auto analysis: every ${secs}s`, 'ok');
-    autoTimer = setInterval(() => {
-      if (currentFrameData) {
-        framesAnalyzed++;
-        const el = document.getElementById('frames-analyzed');
-        if (el) el.textContent = framesAnalyzed;
-        analyzeCurrentFrame();
-      }
-    }, secs * 1000);
-  }
+function startOverlayFade() {
+  if (_fadeRAF) cancelAnimationFrame(_fadeRAF);
+  _fadingOut = true;
+  const ov = document.getElementById('overlay-canvas');
+  const step = () => {
+    if (!_fadingOut) return;
+    _overlayOpacity = Math.max(0, _overlayOpacity - 0.025);
+    ov.style.opacity = _overlayOpacity;
+    if (_overlayOpacity > 0) _fadeRAF = requestAnimationFrame(step);
+  };
+  _fadeRAF = requestAnimationFrame(step);
 }
 
-const PROMPT = `You are an intraoperative surgical AI vision system. Analyze the provided endoscopic or laparoscopic surgery frame and return ONLY a valid JSON object — no markdown, no explanation.
+function snapOverlayIn() {
+  if (_fadeRAF) cancelAnimationFrame(_fadeRAF);
+  _fadingOut = false;
+  _overlayOpacity = 1;
+  document.getElementById('overlay-canvas').style.opacity = 1;
+}
 
-JSON structure:
-{
-  "phase": { "name": "Phase name", "description": "1-sentence description" },
-  "structures": [
-    {
-      "label": "name",
-      "type": "anatomy|instrument|tissue|fluid|other",
-      "confidence": 0.0-1.0,
-      "location": "location description",
-      "color": "#hex",
-      "bbox": [x, y, w, h]
+function startAutoAnalysis() {
+  if (_autoRunning) return;
+  if (!apiKey) { log('Enter Groq API key to enable auto analysis.', 'warn'); return; }
+  _autoRunning = true;
+  log('Auto analysis started.', 'ok');
+  autoTimer = setInterval(async () => {
+    if (!_autoRunning) return;
+    if (_autoAnalyzing) return;
+    if (videoEl && !videoEl.paused) captureFrame();
+    if (!currentFrameData) return;
+    _autoAnalyzing = true;
+    framesAnalyzed++;
+    startOverlayFade();
+    try {
+      await analyzeCurrentFrame();
+    } finally {
+      _autoAnalyzing = false;
     }
-  ],
-  "triplets": [
-    { "instrument": "tool name", "verb": "action verb", "target": "anatomy name", "confidence": 0-100 }
-  ],
-  "warnings": [ { "severity": "critical|warning|info", "message": "text" } ],
-  "summary": "1-sentence scene summary"
+  }, 2000);
 }
 
-BBOX RULES — very important:
-- bbox is [x, y, width, height] normalized 0.0–1.0 (fractions of image size, NOT pixels)
-- x, y = top-left corner of the bounding box
-- Be as TIGHT as possible — hug the visible structure closely, do not pad
-- For thin instruments: make the box narrow and elongated along the tool axis
-- Example tight instrument: [0.35, 0.1, 0.08, 0.6] (narrow width, tall height)
-- Do NOT return overlapping boxes for the same structure
+function stopAutoAnalysis() {
+  _autoRunning = false;
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  snapOverlayIn();
+}
 
-Colors: liver=#c43020 gallbladder=#40a040 vessel=#e03050 fat=#d0b040 instrument=#c0c8d0 bleeding=#ff2040 bile=#80c040 other=#8080c0.
+// Keep toggleAutoAnalysis as alias for compatibility
+function toggleAutoAnalysis() {
+  _autoRunning ? stopAutoAnalysis() : startAutoAnalysis();
+}
+
+const PROMPT = `Surgical AI vision. Analyze this endoscopic frame. Return ONLY compact JSON, no markdown.
+
+{"phase":{"name":"string","description":"1 sentence"},"structures":[{"label":"name","type":"anatomy|instrument|tissue|fluid","confidence":0.0-1.0,"location":"brief","color":"#hex","bbox":[x,y,w,h]}],"triplets":[{"instrument":"name","verb":"verb","target":"name","confidence":0-100}],"warnings":[{"severity":"critical|warning|info","message":"text"}],"summary":"1 sentence"}
+
+BBOX: normalized 0.0-1.0, tight fit, [x,y,w,h] top-left origin. Max 6 structures. Max 3 triplets.
+Colors: liver=#c43020 gallbladder=#40a040 vessel=#e03050 fat=#d0b040 instrument=#c0c8d0 bleeding=#ff2040
 Return ONLY JSON.`;
 
 const ENDOVIT_URL = 'http://localhost:5050';
@@ -835,7 +850,7 @@ async function analyzeCurrentFrame() {
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
         body:JSON.stringify({
           model:'meta-llama/llama-4-scout-17b-16e-instruct',
-          max_tokens:2000, temperature:0.1,
+          max_tokens:1000, temperature:0.1,
           messages:[{role:'user', content:[
             {type:'text', text:PROMPT+'\n\nAnalyze this surgical frame. Return JSON only.'},
             {type:'image_url', image_url:{url:`data:image/jpeg;base64,${currentFrameData}`}}
@@ -848,8 +863,27 @@ async function analyzeCurrentFrame() {
         let clean  = raw.replace(/```json|```/g,'').trim();
         const s = clean.indexOf('{'), e = clean.lastIndexOf('}');
         if (s !== -1 && e !== -1) clean = clean.slice(s, e+1);
-        groqResult = JSON.parse(clean);
-        log(`Groq: phase="${groqResult.phase?.name}" warnings=${(groqResult.warnings||[]).length}`, 'data');
+        // Repair truncated JSON — close any open arrays/objects
+        try {
+          groqResult = JSON.parse(clean);
+        } catch {
+          // Try to salvage partial JSON by closing open structures
+          let depth = 0, inStr = false, repaired = '';
+          for (let i = 0; i < clean.length; i++) {
+            const ch = clean[i];
+            if (ch === '"' && clean[i-1] !== '\\') inStr = !inStr;
+            if (!inStr) { if (ch==='{') depth++; else if (ch==='}') depth--; }
+            repaired += ch;
+          }
+          // Close unclosed string if needed
+          if (inStr) repaired += '"';
+          // Remove trailing comma before closing
+          repaired = repaired.replace(/,\s*$/, '');
+          // Close open arrays/objects
+          while (depth > 0) { repaired += '}'; depth--; }
+          try { groqResult = JSON.parse(repaired); } catch { /* give up */ }
+        }
+        if (groqResult) log(`Groq: phase="${groqResult.phase?.name}" warnings=${(groqResult.warnings||[]).length}`, 'data');
       }
     } catch(ge) {
       log(`Groq error: ${ge.message}`, 'warn');
@@ -881,14 +915,34 @@ async function analyzeCurrentFrame() {
     const elapsed = Math.round(performance.now() - t0);
 
     // ── Merge results ──
-    // Use EndoViT structures if available, else Groq bbox structures
-    const finalStructures = endovitStructures || (groqResult?.structures || []);
+    // Always use Groq structures for labels/confidence/display
+    // EndoViT adds pixel-level mask_points on top of Groq structures when available
+    const groqStructures = groqResult?.structures || [];
+
+    // Enrich Groq structures with EndoViT mask_points where labels match
+    let finalStructures = groqStructures;
+    if (endovitStructures && endovitStructures.length > 0) {
+      finalStructures = groqStructures.map(gs => {
+        const match = endovitStructures.find(es =>
+          es.label?.toLowerCase() === gs.label?.toLowerCase()
+        );
+        return match ? { ...gs, mask_points: match.mask_points } : gs;
+      });
+      // Add any EndoViT structures not in Groq result (low confidence, skip if <10%)
+      const extra = endovitStructures.filter(es =>
+        !groqStructures.find(gs => gs.label?.toLowerCase() === es.label?.toLowerCase())
+        && (es.confidence || 0) > 0.1
+      );
+      finalStructures = [...finalStructures, ...extra];
+    }
+
     const finalAnalysis = {
       phase:      groqResult?.phase      || { name: 'Unknown', description: '' },
       warnings:   groqResult?.warnings   || [],
       summary:    groqResult?.summary    || '',
+      triplets:   groqResult?.triplets   || [],
       structures: finalStructures,
-      _source:    endovitStructures ? 'endovit' : 'groq',
+      _source:    endovitStructures ? 'groq+endovit' : 'groq',
     };
 
     lastAnalysis = finalAnalysis;
@@ -935,9 +989,10 @@ function renderResult(a, ms) {
 }
 
 function drawOverlay(str) {
+  snapOverlayIn(); // new results — restore full opacity immediately
   const ov    = document.getElementById('overlay-canvas');
   const base  = document.getElementById('base-canvas');
-  const ctx   = ov.getContext('2d');
+  const ctx   = ov.getContext('2d', { willReadFrequently: true });
 
   const wrapRect = document.getElementById('canvas-wrap').getBoundingClientRect();
   const imgRect  = base.getBoundingClientRect();
@@ -1080,12 +1135,26 @@ function drawOverlay(str) {
         const ovX=Math.round(ox+px2*scaleX), ovY=Math.round(oy+py2*scaleY);
         if(ovX<0||ovX>=ov.width||ovY<0||ovY>=ov.height) continue;
         const oi=(ovY*ov.width+ovX)*4;
-        od[oi]=rgb.r; od[oi+1]=rgb.g; od[oi+2]=rgb.b; od[oi+3]=140;
+        od[oi]=rgb.r; od[oi+1]=rgb.g; od[oi+2]=rgb.b; od[oi+3]=130;
       }
     });
 
     ctx.putImageData(ovData, 0, 0);
 
+    // ── Clip to circular endoscope viewport ──
+    const cx2 = ox + iw/2, cy2 = oy + ih/2;
+    const rx = iw/2 * 0.93, ry = ih/2 * 0.93;
+    const clipData = ctx.getImageData(0, 0, ov.width, ov.height);
+    const cd = clipData.data;
+    for (let y = 0; y < ov.height; y++) {
+      for (let x = 0; x < ov.width; x++) {
+        const dx = (x - cx2)/rx, dy = (y - cy2)/ry;
+        if (dx*dx + dy*dy > 1) cd[(y*ov.width+x)*4+3] = 0;
+      }
+    }
+    ctx.putImageData(clipData, 0, 0);
+
+    // ── Labels only ──
     str.forEach(s => {
       if (!s.bbox||s.bbox.length<4) return;
       const norm=v=>v>1?v/100:v;
@@ -1170,12 +1239,7 @@ function clearScene() {
   document.getElementById('det-badge').textContent='0';
   document.getElementById('warn-list').innerHTML='<div class="wrow info"><span>No active warnings.</span></div>';
   setBadge('warn-badge','CLEAR','bg');
-  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-  const toggle = document.getElementById('auto-toggle');
-  const label  = document.getElementById('auto-label');
-  if (toggle) toggle.classList.remove('on');
-  if (label)  { label.textContent = 'AUTO'; label.className = 'auto-lbl'; }
-  framesAnalyzed = 0;
+  stopAutoAnalysis();
 
   // Reset triplets
   document.getElementById('triplet-list').innerHTML = '<div class="emsg">No triplets detected.<br/>Run analysis to populate.</div>';
